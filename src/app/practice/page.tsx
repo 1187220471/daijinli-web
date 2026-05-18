@@ -20,6 +20,7 @@ export default function Practice() {
   const [referenceAnswer, setReferenceAnswer] = useState('')
   const [userAnswer, setUserAnswer] = useState('')
   const [evaluation, setEvaluation] = useState('')
+  const [improvedAnswer, setImprovedAnswer] = useState('')
   const [score, setScore] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'select' | 'question' | 'answer' | 'result'>('select')
@@ -50,6 +51,7 @@ export default function Practice() {
     setReferenceAnswer('')
     setUserAnswer('')
     setEvaluation('')
+    setImprovedAnswer('')
     setScore(null)
 
     try {
@@ -87,7 +89,6 @@ export default function Practice() {
       const data = await res.json()
       if (data.answer) {
         setReferenceAnswer(data.answer)
-        setStep('answer')
       } else {
         alert(data.error || '生成答案失败')
       }
@@ -121,6 +122,7 @@ export default function Practice() {
       if (data.evaluation) {
         setEvaluation(data.evaluation)
         setScore(data.score)
+        setImprovedAnswer(data.improvedAnswer || '')
         setStep('result')
       } else {
         alert(data.error || '批改失败')
@@ -138,6 +140,7 @@ export default function Practice() {
     setReferenceAnswer('')
     setUserAnswer('')
     setEvaluation('')
+    setImprovedAnswer('')
     setScore(null)
     setSelectedType('')
   }
@@ -205,7 +208,7 @@ export default function Practice() {
           </div>
         )}
 
-        {/* Step 2: Show Question */}
+        {/* Step 2-4: Question / Answer / Result */}
         {(step === 'question' || step === 'answer' || step === 'result') && (
           <div>
             {/* Question Card */}
@@ -221,7 +224,7 @@ export default function Practice() {
               </div>
             </div>
 
-            {/* Reference Answer */}
+            {/* Reference Answer (when user chooses to view it) */}
             {referenceAnswer && (
               <div className="bg-green-50 rounded-xl border border-green-200 p-6 mb-6">
                 <div className="flex items-center gap-2 mb-3">
@@ -252,67 +255,84 @@ export default function Practice() {
 
             {/* Evaluation Result */}
             {step === 'result' && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">📊</span>
-                    <h3 className="font-bold text-slate-800">AI批改结果</h3>
-                  </div>
-                  {score !== null && (
+              <>
+                {/* Score Card */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                  <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-500">得分：</span>
-                      <span
-                        className={`text-2xl font-bold ${
-                          score >= 80
-                            ? 'text-green-600'
-                            : score >= 60
-                            ? 'text-yellow-600'
-                            : 'text-red-600'
-                        }`}
-                      >
-                        {score}
-                      </span>
-                      <span className="text-slate-400">/100</span>
+                      <span className="text-lg">📊</span>
+                      <h3 className="font-bold text-slate-800">AI批改结果</h3>
                     </div>
-                  )}
+                    {score !== null && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-500">得分：</span>
+                        <span
+                          className={`text-2xl font-bold ${
+                            score >= 80
+                              ? 'text-green-600'
+                              : score >= 60
+                              ? 'text-yellow-600'
+                              : 'text-red-600'
+                          }`}
+                        >
+                          {score}
+                        </span>
+                        <span className="text-slate-400">/100</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {evaluation}
+                  </div>
                 </div>
-                <div className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                  {evaluation}
-                </div>
-              </div>
-            )}
 
-            {/* User Answer Display (in result step) */}
-            {step === 'result' && userAnswer && (
-              <div className="bg-slate-50 rounded-xl border border-slate-200 p-6 mb-6">
-                <h3 className="font-bold text-slate-700 mb-3">你的答案</h3>
-                <div className="text-slate-600 leading-relaxed whitespace-pre-wrap">
-                  {userAnswer}
-                </div>
-              </div>
+                {/* Improved Answer */}
+                {improvedAnswer && (
+                  <div className="bg-blue-50 rounded-xl border border-blue-200 p-6 mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-lg">✨</span>
+                      <h3 className="font-bold text-blue-800">改进版答案（基于你的答案优化）</h3>
+                    </div>
+                    <div className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {improvedAnswer}
+                    </div>
+                  </div>
+                )}
+
+                {/* User Original Answer */}
+                {userAnswer && (
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-6 mb-6">
+                    <h3 className="font-bold text-slate-700 mb-3">你的原始答案</h3>
+                    <div className="text-slate-600 leading-relaxed whitespace-pre-wrap">
+                      {userAnswer}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 justify-center">
-              {step === 'question' && !referenceAnswer && (
-                <button
-                  onClick={handleGenerateAnswer}
-                  disabled={loading}
-                  className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
-                >
-                  {loading ? '生成中...' : '生成参考答案'}
-                </button>
+              {/* Question step: two main buttons */}
+              {step === 'question' && (
+                <>
+                  <button
+                    onClick={() => setStep('answer')}
+                    className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors"
+                  >
+                    📝 先自己作答
+                  </button>
+                  <button
+                    onClick={handleGenerateAnswer}
+                    disabled={loading}
+                    className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    {loading ? '生成中...' : '👀 直接查看参考答案'}
+                  </button>
+                </>
               )}
 
-              {step === 'question' && referenceAnswer && (
-                <button
-                  onClick={() => setStep('answer')}
-                  className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors"
-                >
-                  开始作答
-                </button>
-              )}
-
+              {/* Answer step */}
               {step === 'answer' && (
                 <>
                   <button
@@ -331,13 +351,25 @@ export default function Practice() {
                 </>
               )}
 
+              {/* Result step */}
               {step === 'result' && (
-                <button
-                  onClick={handleNewQuestion}
-                  className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors"
-                >
-                  再来一题
-                </button>
+                <>
+                  <button
+                    onClick={handleNewQuestion}
+                    className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors"
+                  >
+                    再来一题
+                  </button>
+                  {!referenceAnswer && (
+                    <button
+                      onClick={handleGenerateAnswer}
+                      disabled={loading}
+                      className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      {loading ? '生成中...' : '查看参考答案'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
