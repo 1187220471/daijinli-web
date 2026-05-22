@@ -1,7 +1,7 @@
 {
   "name": "daijinli-web",
   "version": "1.0.0",
-  "description": "戴锦鲤 - AI面试训练平台",
+  "description": "江苏公务员面试答题训练 - AI智能训练平台",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && prisma db push --accept-data-loss && next build",

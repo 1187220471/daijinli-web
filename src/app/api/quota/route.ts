@@ -1,26 +1,15 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getTokenFromRequest } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { getQuotaInfo } from '@/lib/quota'
 
 export async function GET(request: Request) {
   try {
-    const token = getTokenFromRequest(request)
-    if (!token) {
-      return NextResponse.json(
-        { error: '未登录' },
-        { status: 401 }
-      )
+    const auth = requireAuth(request)
+    if (!auth.success) {
+      return auth.response
     }
 
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json(
-        { error: '登录已过期' },
-        { status: 401 }
-      )
-    }
-
-    const info = await getQuotaInfo(payload.userId)
+    const info = await getQuotaInfo(auth.userId)
 
     if (!info) {
       return NextResponse.json(

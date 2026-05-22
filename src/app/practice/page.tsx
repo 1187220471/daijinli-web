@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { getAuthHeaders } from '@/lib/auth'
 import { QUESTION_TYPE_LABELS } from '@/types'
 
 const questionTypes = [
@@ -33,13 +34,6 @@ export default function Practice() {
     }
   }, [router])
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token')
-    return {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    }
-  }
 
   const handleGenerateQuestion = async () => {
     if (!selectedType) {

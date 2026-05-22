@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { generateQuestion } from '@/lib/ai'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromRequest } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { checkQuota } from '@/lib/quota'
 
 // 去重缓存：每个用户保留最近使用过的主题数量
@@ -9,20 +9,9 @@ const RECENT_TOPICS_LIMIT = 10
 
 export async function POST(request: Request) {
   try {
-    const token = getTokenFromRequest(request)
-    if (!token) {
-      return NextResponse.json(
-        { error: '未登录' },
-        { status: 401 }
-      )
-    }
-
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json(
-        { error: '登录已过期' },
-        { status: 401 }
-      )
+    const auth = requireAuth(request)
+    if (!auth.success) {
+      return auth.response
     }
 
     const { type } = await request.json()
@@ -35,7 +24,7 @@ export async function POST(request: Request) {
     }
 
     // 检查额度
-    const quota = await checkQuota(payload.userId)
+    const quota = await checkQuota(auth.userId)
     if (!quota.allowed) {
       return NextResponse.json(
         { error: quota.message },
@@ -45,7 +34,7 @@ export async function POST(request: Request) {
 
     // 读取用户最近使用过的主题（去重缓存）
     const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
+      where: { id: auth.userId },
       select: { recentTopics: true },
     })
 
@@ -61,7 +50,7 @@ export async function POST(request: Request) {
     }
 
     await prisma.user.update({
-      where: { id: payload.userId },
+      where: { id: auth.userId },
       data: { recentTopics: JSON.stringify(updatedTopics) },
     })
 

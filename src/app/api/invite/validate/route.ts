@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromRequest } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 
 export async function POST(request: Request) {
   try {
-    const token = getTokenFromRequest(request)
-    if (!token) {
-      return NextResponse.json({ error: '未登录' }, { status: 401 })
-    }
-
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: '登录已过期' }, { status: 401 })
+    const auth = requireAuth(request)
+    if (!auth.success) {
+      return auth.response
     }
 
     const { code } = await request.json()
@@ -35,7 +30,7 @@ export async function POST(request: Request) {
 
     // 获取当前用户信息
     const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
+      where: { id: auth.userId },
       select: {
         id: true,
         vipType: true,

@@ -35,10 +35,7 @@ export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
 
   // 2. 检查是否需要重置每日免费次数（跨天了）
   const resetAt = new Date(user.freeCountResetAt)
-  const isSameDay =
-    resetAt.getFullYear() === now.getFullYear() &&
-    resetAt.getMonth() === now.getMonth() &&
-    resetAt.getDate() === now.getDate()
+  const isSameDay = resetAt.toDateString() === now.toDateString()
 
   if (!isSameDay) {
     // 重置免费次数
@@ -138,10 +135,7 @@ export async function getQuotaInfo(userId: string) {
 
   const now = new Date()
   const resetAt = new Date(user.freeCountResetAt)
-  const isSameDay =
-    resetAt.getFullYear() === now.getFullYear() &&
-    resetAt.getMonth() === now.getMonth() &&
-    resetAt.getDate() === now.getDate()
+  const isSameDay = resetAt.toDateString() === now.toDateString()
 
   let remainingFree = user.dailyFreeCount
   if (!isSameDay) {

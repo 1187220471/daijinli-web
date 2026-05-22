@@ -1,21 +1,17 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromRequest } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
+import { getQuotaInfo } from '@/lib/quota'
 
 export async function GET(request: Request) {
   try {
-    const token = getTokenFromRequest(request)
-    if (!token) {
-      return NextResponse.json({ error: '未登录' }, { status: 401 })
-    }
-
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: '登录已过期' }, { status: 401 })
+    const auth = requireAuth(request)
+    if (!auth.success) {
+      return auth.response
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
+      where: { id: auth.userId },
       select: {
         id: true,
         username: true,
@@ -23,9 +19,6 @@ export async function GET(request: Request) {
         createdAt: true,
         vipType: true,
         vipExpire: true,
-        dailyFreeCount: true,
-        freeCountResetAt: true,
-        coins: true,
       },
     })
 
@@ -33,19 +26,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 })
     }
 
-    const now = new Date()
-    const resetAt = new Date(user.freeCountResetAt)
-    const isSameDay =
-      resetAt.getFullYear() === now.getFullYear() &&
-      resetAt.getMonth() === now.getMonth() &&
-      resetAt.getDate() === now.getDate()
-
-    let remainingFree = user.dailyFreeCount
-    if (!isSameDay) {
-      remainingFree = 5
-    }
-
-    const isVip = user.vipType !== 'none' && user.vipExpire && user.vipExpire > now
+    // 使用统一的额度查询（避免重复计算逻辑）
+    const quotaInfo = await getQuotaInfo(auth.userId)
 
     // 获取使用统计
     const totalPractices = await prisma.record.count({
@@ -74,10 +56,10 @@ export async function GET(request: Request) {
         createdAt: user.createdAt.toISOString().split('T')[0],
       },
       membership: {
-        isVip,
+        isVip: quotaInfo?.isVip || false,
         vipType: user.vipType,
         vipExpire: user.vipExpire ? user.vipExpire.toISOString().split('T')[0] : null,
-        remainingFree: isVip ? 999 : remainingFree,
+        remainingFree: quotaInfo?.remainingFree || 0,
       },
       stats: {
         totalPractices,

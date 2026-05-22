@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { getAuthHeaders } from '@/lib/auth'
 
 export default function CustomQuestion() {
   const router = useRouter()
@@ -16,13 +17,6 @@ export default function CustomQuestion() {
     }
   }, [router])
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token')
-    return {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    }
-  }
 
   const handleGenerateAnswer = async () => {
     if (!question.trim() || question.trim().length < 10) {

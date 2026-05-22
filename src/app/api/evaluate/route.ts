@@ -1,25 +1,14 @@
 import { NextResponse } from 'next/server'
 import { evaluateAnswer, generateReferenceAnswer } from '@/lib/ai'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromRequest } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { checkQuota, deductQuota } from '@/lib/quota'
 
 export async function POST(request: Request) {
   try {
-    const token = getTokenFromRequest(request)
-    if (!token) {
-      return NextResponse.json(
-        { error: '未登录' },
-        { status: 401 }
-      )
-    }
-
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json(
-        { error: '登录已过期' },
-        { status: 401 }
-      )
+    const auth = requireAuth(request)
+    if (!auth.success) {
+      return auth.response
     }
 
     const { question, referenceAnswer, userAnswer, type } = await request.json()
@@ -32,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     // 检查额度
-    const quota = await checkQuota(payload.userId)
+    const quota = await checkQuota(auth.userId)
     if (!quota.allowed) {
       return NextResponse.json(
         { error: quota.message },
@@ -41,7 +30,7 @@ export async function POST(request: Request) {
     }
 
     // 扣除额度（仅批改扣次，查看参考答案不扣次）
-    await deductQuota(payload.userId)
+    await deductQuota(auth.userId)
 
     // 如果没有参考答案，并行生成（让用户在批改后直接看到，不额外消耗次数）
     let finalReferenceAnswer = referenceAnswer || ''
@@ -59,7 +48,7 @@ export async function POST(request: Request) {
     // 保存记录
     const record = await prisma.record.create({
       data: {
-        userId: payload.userId,
+        userId: auth.userId,
         questionType: type || 'social',
         question,
         referenceAnswer: finalReferenceAnswer,

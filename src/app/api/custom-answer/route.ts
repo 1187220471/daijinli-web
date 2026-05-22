@@ -1,24 +1,13 @@
 import { NextResponse } from 'next/server'
 import { generateReferenceAnswer } from '@/lib/ai'
-import { verifyToken, getTokenFromRequest } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { checkQuota, deductQuota } from '@/lib/quota'
 
 export async function POST(request: Request) {
   try {
-    const token = getTokenFromRequest(request)
-    if (!token) {
-      return NextResponse.json(
-        { error: '未登录' },
-        { status: 401 }
-      )
-    }
-
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json(
-        { error: '登录已过期' },
-        { status: 401 }
-      )
+    const auth = requireAuth(request)
+    if (!auth.success) {
+      return auth.response
     }
 
     const { question } = await request.json()
@@ -31,7 +20,7 @@ export async function POST(request: Request) {
     }
 
     // 检查额度
-    const quota = await checkQuota(payload.userId)
+    const quota = await checkQuota(auth.userId)
     if (!quota.allowed) {
       return NextResponse.json(
         { error: quota.message },
@@ -40,7 +29,7 @@ export async function POST(request: Request) {
     }
 
     // 扣除额度
-    await deductQuota(payload.userId)
+    await deductQuota(auth.userId)
 
     const answer = await generateReferenceAnswer(question)
 
