@@ -114,7 +114,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           <button
             onClick={() => router.push('/practice')}
             className="bg-primary-600 hover:bg-primary-700 text-white p-8 rounded-2xl shadow-lg transition-all hover:shadow-xl text-left group"
@@ -145,6 +145,17 @@ export default function Home() {
             <h3 className="text-xl font-bold mb-2">练习记录</h3>
             <p className="text-slate-500 text-sm">
               查看历史答题记录和AI批改结果
+            </p>
+          </button>
+
+          <button
+            onClick={() => router.push('/daily-news')}
+            className="bg-white hover:bg-slate-50 text-slate-800 p-8 rounded-2xl shadow-lg transition-all hover:shadow-xl text-left border border-slate-200 group"
+          >
+            <div className="text-4xl mb-4">📰</div>
+            <h3 className="text-xl font-bold mb-2">每日政务要闻</h3>
+            <p className="text-slate-500 text-sm">
+              每天19:00自动抓取江苏政务新闻，AI精选公考备考素材
             </p>
           </button>
         </div>
