@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { checkQuota } from '@/lib/quota'
 
-// 去重缓存：每个用户保留最近使用过的主题数量
+// 每个用户保留最近使用过的主题数量（FIFO队列）
 const RECENT_TOPICS_LIMIT = 10
 
 export async function POST(request: Request) {
@@ -32,32 +32,36 @@ export async function POST(request: Request) {
       )
     }
 
-    // 读取用户最近使用过的主题（去重缓存）
-    const user = await prisma.user.findUnique({
-      where: { id: auth.userId },
-      select: { recentTopics: true },
-    })
+    // 原子事务：读取 → 出题 → 更新去重缓存
+    // 用事务保证在并发请求下不会丢失更新
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. 读取当前缓存
+      const user = await tx.user.findUnique({
+        where: { id: auth.userId },
+        select: { recentTopics: true },
+      })
 
-    const recentTopics = JSON.parse(user?.recentTopics || '[]') as string[]
+      const recentTopics: string[] = user?.recentTopics ?? []
 
-    // 出题不扣次数，传入排除主题以实现去重
-    const { question, topic } = await generateQuestion(type, recentTopics)
+      // 2. 出题（传入排除主题）
+      const { question, topic } = await generateQuestion(type, recentTopics)
 
-    // 更新去重缓存：将新主题加入队列，保持最近 N 个（FIFO）
-    const updatedTopics = [...recentTopics.filter(t => t !== topic), topic]
-    if (updatedTopics.length > RECENT_TOPICS_LIMIT) {
-      updatedTopics.shift() // 移除最旧的主题
-    }
+      // 3. 更新 FIFO 队列
+      const filtered = recentTopics.filter((t: string) => t !== topic)
+      const updatedTopics = [topic, ...filtered].slice(0, RECENT_TOPICS_LIMIT)
 
-    await prisma.user.update({
-      where: { id: auth.userId },
-      data: { recentTopics: JSON.stringify(updatedTopics) },
+      await tx.user.update({
+        where: { id: auth.userId },
+        data: { recentTopics: updatedTopics },
+      })
+
+      return { question, topic, remainingFree: quota.remainingFree }
     })
 
     return NextResponse.json({
-      question,
+      question: result.question,
       type,
-      remainingFree: quota.remainingFree,
+      remainingFree: result.remainingFree,
     })
   } catch (error) {
     console.error('Generate question error:', error)
