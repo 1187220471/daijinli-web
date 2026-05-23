@@ -152,3 +152,30 @@ export async function getQuotaInfo(userId: string) {
     coins: user.coins,
   }
 }
+
+/**
+ * 检查用户是否为有效VIP会员
+ * 用于会员专享功能（如套题训练）
+ */
+export async function checkVip(userId: string): Promise<{ isVip: boolean; message: string }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      vipType: true,
+      vipExpire: true,
+    },
+  })
+
+  if (!user) {
+    return { isVip: false, message: '用户不存在' }
+  }
+
+  const now = new Date()
+  const isVip = user.vipType !== 'none' && user.vipExpire && user.vipExpire > now
+
+  if (isVip) {
+    return { isVip: true, message: 'VIP会员' }
+  }
+
+  return { isVip: false, message: '该功能为会员专享' }
+}

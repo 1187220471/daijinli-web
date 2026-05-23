@@ -26,6 +26,7 @@ export default function Practice() {
   const [score, setScore] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'select' | 'question' | 'answer' | 'result'>('select')
+  const [showVipModal, setShowVipModal] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -144,6 +145,32 @@ export default function Practice() {
     setSelectedType('')
   }
 
+  const handleSetTraining = async (mode: string) => {
+    try {
+      const res = await fetch('/api/questions/set-generate', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ mode }),
+      })
+
+      if (res.status === 403) {
+        setShowVipModal(true)
+        return
+      }
+
+      const data = await res.json()
+      if (data.questions) {
+        // 将会员套题数据存入 localStorage，跳转到套题页面
+        localStorage.setItem('setTrainingData', JSON.stringify(data))
+        router.push(`/practice/set/${mode}`)
+      } else {
+        alert(data.error || '生成套题失败')
+      }
+    } catch {
+      alert('网络错误')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -196,7 +223,7 @@ export default function Practice() {
                 </button>
               ))}
             </div>
-            <div className="text-center">
+            <div className="text-center mb-10">
               <button
                 onClick={handleGenerateQuestion}
                 disabled={loading || !selectedType}
@@ -204,6 +231,34 @@ export default function Practice() {
               >
                 {loading ? '生成中...' : '随机出题'}
               </button>
+            </div>
+
+            {/* 套题训练入口 */}
+            <div className="border-t border-slate-200 pt-8">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">
+                套题训练 <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ml-2">会员专享</span>
+              </h3>
+              <p className="text-sm text-slate-500 text-center mb-4">
+                模拟真实考场，一次性生成完整套题，支持下载Word文档
+              </p>
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={() => handleSetTraining('3')}
+                  className="bg-white border-2 border-slate-200 hover:border-amber-400 text-slate-700 hover:text-amber-700 font-medium px-6 py-4 rounded-xl transition-all text-center"
+                >
+                  <div className="text-2xl mb-1">📋</div>
+                  <div className="text-sm">事业单位</div>
+                  <div className="text-xs text-slate-400 mt-1">3道题 / 12分钟</div>
+                </button>
+                <button
+                  onClick={() => handleSetTraining('4')}
+                  className="bg-white border-2 border-slate-200 hover:border-amber-400 text-slate-700 hover:text-amber-700 font-medium px-6 py-4 rounded-xl transition-all text-center"
+                >
+                  <div className="text-2xl mb-1">📑</div>
+                  <div className="text-sm">公务员</div>
+                  <div className="text-xs text-slate-400 mt-1">4道题 / 15分钟</div>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -371,6 +426,25 @@ export default function Practice() {
                   )}
                 </>
               )}
+            </div>
+          </div>
+        )}
+      </div>
+        {/* VIP弹窗 */}
+        {showVipModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-sm mx-4 text-center">
+              <div className="text-4xl mb-4">🔒</div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">该功能为会员专享</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                套题训练功能仅限会员使用，可模拟真实考场环境，支持下载Word文档。
+              </p>
+              <button
+                onClick={() => setShowVipModal(false)}
+                className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors"
+              >
+                我知道了
+              </button>
             </div>
           </div>
         )}
