@@ -110,10 +110,14 @@ export default function SetResultPage() {
       if (userAnswers[q.index]) {
         children.push(
           new Paragraph({
-            text: '【你的答案】',
+            children: [
+              new TextRun({
+                text: '【你的答案】',
+                bold: true,
+                color: '2563EB',
+              }),
+            ],
             spacing: { before: 300, after: 200 },
-            bold: true,
-            color: '2563EB',
           })
         )
         const userLines = userAnswers[q.index].split('\n').filter(line => line.trim())
@@ -132,10 +136,14 @@ export default function SetResultPage() {
       if (refAnswers[q.index]) {
         children.push(
           new Paragraph({
-            text: '【参考答案】',
+            children: [
+              new TextRun({
+                text: '【参考答案】',
+                bold: true,
+                color: '2D7D46',
+              }),
+            ],
             spacing: { before: 300, after: 200 },
-            bold: true,
-            color: '2D7D46',
           })
         )
         const refLines = refAnswers[q.index].split('\n').filter(line => line.trim())
