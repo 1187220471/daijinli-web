@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getAuthHeaders } from '@/lib/auth'
+import { downloadSetDoc, downloadSetDocHtml } from '@/lib/docx-export'
 
 interface QuestionItem {
   index: number
@@ -30,6 +31,7 @@ export default function SetTrainingPage() {
   const [showAnswers, setShowAnswers] = useState(false)
   const [answers, setAnswers] = useState<Record<number, string>>({})
   const [loadingAnswers, setLoadingAnswers] = useState(false)
+  const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -74,6 +76,9 @@ export default function SetTrainingPage() {
       }
       setAnswers(newAnswers)
       setShowAnswers(true)
+      // 保存到 localStorage，方便下载
+      localStorage.setItem(`setRefAnswers_${mode}`, JSON.stringify(newAnswers))
+      localStorage.setItem(`setUserAnswers_${mode}`, JSON.stringify({}))
     } catch {
       alert('生成答案失败')
     } finally {
@@ -82,17 +87,27 @@ export default function SetTrainingPage() {
   }
 
   const handleSelfAnswer = () => {
-    // 进入逐题作答流程
     router.push(`/practice/set/${mode}/answer`)
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!setData) return
-    // 触发下载Word文档
-    const event = new CustomEvent('downloadSetDoc', {
-      detail: { setData, answers },
-    })
-    window.dispatchEvent(event)
+    setDownloading(true)
+    try {
+      const storedUserAnswers = localStorage.getItem(`setUserAnswers_${mode}`)
+      const storedRefAnswers = localStorage.getItem(`setRefAnswers_${mode}`)
+      const userAnswers = storedUserAnswers ? JSON.parse(storedUserAnswers) : {}
+      const refAnswers = storedRefAnswers ? JSON.parse(storedRefAnswers) : answers
+      await downloadSetDoc(setData, userAnswers, refAnswers)
+    } catch {
+      const storedUserAnswers = localStorage.getItem(`setUserAnswers_${mode}`)
+      const storedRefAnswers = localStorage.getItem(`setRefAnswers_${mode}`)
+      const userAnswers = storedUserAnswers ? JSON.parse(storedUserAnswers) : {}
+      const refAnswers = storedRefAnswers ? JSON.parse(storedRefAnswers) : answers
+      downloadSetDocHtml(setData, userAnswers, refAnswers)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   if (loading) {
@@ -188,6 +203,19 @@ export default function SetTrainingPage() {
           ))}
         </div>
 
+        {/* 生成答案中遮罩 */}
+        {loadingAnswers && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-sm mx-4 text-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600 mx-auto mb-4"></div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">正在生成参考答案</h3>
+              <p className="text-sm text-slate-500">
+                AI正在生成{setData.questions.length}道题的参考答案，预计30-60秒，请稍后...
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* 操作按钮 */}
         <div className="flex flex-wrap gap-3 justify-center">
           {!showAnswers ? (
@@ -203,7 +231,7 @@ export default function SetTrainingPage() {
                 disabled={loadingAnswers}
                 className="bg-green-600 hover:bg-green-700 text-white font-medium px-8 py-3 rounded-xl transition-colors disabled:opacity-50"
               >
-                {loadingAnswers ? '生成中...' : '👀 直接查看参考答案'}
+                👀 直接查看参考答案
               </button>
             </>
           ) : (
@@ -216,9 +244,10 @@ export default function SetTrainingPage() {
               </button>
               <button
                 onClick={handleDownload}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-3 rounded-xl transition-colors"
+                disabled={downloading}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-3 rounded-xl transition-colors disabled:opacity-50"
               >
-                📥 下载Word文档
+                {downloading ? '下载中...' : '📥 下载Word文档'}
               </button>
               <button
                 onClick={() => router.push('/practice')}

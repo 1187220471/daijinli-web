@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx'
+import { downloadSetDoc, downloadSetDocHtml } from '@/lib/docx-export'
 
 interface QuestionItem {
   index: number
@@ -29,6 +29,7 @@ export default function SetResultPage() {
   const [refAnswers, setRefAnswers] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -63,136 +64,18 @@ export default function SetResultPage() {
 
   const handleDownload = async () => {
     if (!setData) return
-
-    const date = new Date().toLocaleDateString('zh-CN')
-    const children: Paragraph[] = []
-
-    // 标题
-    children.push(
-      new Paragraph({
-        text: setData.name,
-        heading: HeadingLevel.HEADING_1,
-        alignment: AlignmentType.CENTER,
-      })
-    )
-    children.push(
-      new Paragraph({
-        text: `生成日期：${date} · 建议作答时间：${setData.time}`,
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 400 },
-      })
-    )
-
-    // 每道题
-    setData.questions.forEach((q) => {
-      // 题号和题型
-      children.push(
-        new Paragraph({
-          text: `第${q.index}题 【${q.typeName}】`,
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 400, after: 200 },
-        })
-      )
-
-      // 题目内容（按行分割）
-      const questionLines = q.question.split('\n').filter(line => line.trim())
-      questionLines.forEach(line => {
-        children.push(
-          new Paragraph({
-            children: [new TextRun({ text: line, size: 24 })],
-            spacing: { after: 120 },
-            indent: { firstLine: 480 },
-          })
-        )
-      })
-
-      // 用户答案
-      if (userAnswers[q.index]) {
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: '【你的答案】',
-                bold: true,
-                color: '2563EB',
-              }),
-            ],
-            spacing: { before: 300, after: 200 },
-          })
-        )
-        const userLines = userAnswers[q.index].split('\n').filter(line => line.trim())
-        userLines.forEach(line => {
-          children.push(
-            new Paragraph({
-              children: [new TextRun({ text: line, size: 24 })],
-              spacing: { after: 120 },
-              indent: { firstLine: 480 },
-            })
-          )
-        })
-      }
-
-      // 参考答案
-      if (refAnswers[q.index]) {
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: '【参考答案】',
-                bold: true,
-                color: '2D7D46',
-              }),
-            ],
-            spacing: { before: 300, after: 200 },
-          })
-        )
-        const refLines = refAnswers[q.index].split('\n').filter(line => line.trim())
-        refLines.forEach(line => {
-          children.push(
-            new Paragraph({
-              children: [new TextRun({ text: line, size: 24 })],
-              spacing: { after: 120 },
-              indent: { firstLine: 480 },
-            })
-          )
-        })
-      }
-
-      // 分隔
-      children.push(new Paragraph({ text: '', spacing: { after: 200 } }))
-    })
-
-    // 创建文档
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            margin: {
-              top: 1440,
-              right: 1440,
-              bottom: 1440,
-              left: 1440,
-            },
-          },
-        },
-        children,
-      }],
-    })
-
-    // 生成并下载
-    const blob = await Packer.toBlob(doc)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${setData.name}_${date}.docx`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    setDownloading(true)
+    try {
+      // 优先尝试 docx 库，失败则回退到 HTML 方案
+      await downloadSetDoc(setData, userAnswers, refAnswers)
+    } catch {
+      downloadSetDocHtml(setData, userAnswers, refAnswers)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   const handleNewSet = () => {
-    // 清除localStorage中的套题数据
     localStorage.removeItem(`setUserAnswers_${mode}`)
     localStorage.removeItem(`setRefAnswers_${mode}`)
     router.push('/practice')
@@ -240,7 +123,7 @@ export default function SetResultPage() {
             <span className="font-bold">江苏公务员面试答题训练</span>
           </button>
           <div className="text-sm text-slate-500">
-            套题结果
+            套题训练结果
           </div>
         </div>
       </header>
@@ -255,8 +138,8 @@ export default function SetResultPage() {
                 共 {setData.questions.length} 道题 · 建议作答时间 {setData.time}
               </p>
             </div>
-            <span className="bg-green-100 text-green-700 text-xs font-medium px-3 py-1 rounded-full">
-              已完成
+            <span className="bg-amber-100 text-amber-700 text-xs font-medium px-3 py-1 rounded-full">
+              会员专享
             </span>
           </div>
         </div>
@@ -273,8 +156,6 @@ export default function SetResultPage() {
                   {q.typeName}
                 </span>
               </div>
-
-              {/* 题目 */}
               <div className="text-slate-800 leading-relaxed whitespace-pre-wrap mb-4">
                 {q.question}
               </div>
@@ -312,9 +193,10 @@ export default function SetResultPage() {
         <div className="flex flex-wrap gap-3 justify-center">
           <button
             onClick={handleDownload}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-3 rounded-xl transition-colors"
+            disabled={downloading}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-3 rounded-xl transition-colors disabled:opacity-50"
           >
-            📥 下载Word文档
+            {downloading ? '下载中...' : '📥 下载Word文档'}
           </button>
           <button
             onClick={handleNewSet}

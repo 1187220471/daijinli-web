@@ -27,6 +27,7 @@ export default function Practice() {
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'select' | 'question' | 'answer' | 'result'>('select')
   const [showVipModal, setShowVipModal] = useState(false)
+  const [setLoadingMode, setSetLoadingMode] = useState<string | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -146,6 +147,7 @@ export default function Practice() {
   }
 
   const handleSetTraining = async (mode: string) => {
+    setSetLoadingMode(mode)
     try {
       const res = await fetch('/api/questions/set-generate', {
         method: 'POST',
@@ -155,19 +157,21 @@ export default function Practice() {
 
       if (res.status === 403) {
         setShowVipModal(true)
+        setSetLoadingMode(null)
         return
       }
 
       const data = await res.json()
       if (data.questions) {
-        // 将会员套题数据存入 localStorage，跳转到套题页面
         localStorage.setItem('setTrainingData', JSON.stringify(data))
         router.push(`/practice/set/${mode}`)
       } else {
         alert(data.error || '生成套题失败')
+        setSetLoadingMode(null)
       }
     } catch {
       alert('网络错误')
+      setSetLoadingMode(null)
     }
   }
 
@@ -444,6 +448,19 @@ export default function Practice() {
               >
                 我知道了
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* 套题生成中弹窗 */}
+        {setLoadingMode && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-sm mx-4 text-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">正在生成套题</h3>
+              <p className="text-sm text-slate-500">
+                AI正在生成{setLoadingMode === '3' ? '3道' : '4道'}面试题，预计30秒，请稍后...
+              </p>
             </div>
           </div>
         )}
