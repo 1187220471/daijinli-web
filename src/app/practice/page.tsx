@@ -429,7 +429,6 @@ export default function Practice() {
             </div>
           </div>
         )}
-      </div>
         {/* VIP弹窗 */}
         {showVipModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
