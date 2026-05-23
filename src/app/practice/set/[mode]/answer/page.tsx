@@ -31,6 +31,8 @@ export default function SetAnswerPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [submitStep, setSubmitStep] = useState('')
+  const [submitProgress, setSubmitProgress] = useState(0)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -116,6 +118,7 @@ export default function SetAnswerPage() {
 
     try {
       // 生成参考答案
+      setSubmitStep('正在生成参考答案...')
       const refAnswers: Record<number, string> = {}
       for (const q of setData.questions) {
         const res = await fetch('/api/answers/generate', {
@@ -129,7 +132,10 @@ export default function SetAnswerPage() {
 
       // 逐题调用AI批改
       const evaluations: Record<number, { score: number; evaluation: string; improvedAnswer: string }> = {}
-      for (const q of setData.questions) {
+      for (let i = 0; i < setData.questions.length; i++) {
+        const q = setData.questions[i]
+        setSubmitStep(`正在评分第${i + 1}/${setData.questions.length}题...`)
+        setSubmitProgress(i + 1)
         const userAnswer = userAnswers[q.index]
         if (userAnswer) {
           try {
@@ -168,6 +174,8 @@ export default function SetAnswerPage() {
       alert('提交失败，请稍后重试')
     } finally {
       setSubmitting(false)
+      setSubmitStep('')
+      setSubmitProgress(0)
     }
   }
 
@@ -205,6 +213,28 @@ export default function SetAnswerPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* 提交中全屏遮罩 */}
+      {submitting && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-sm mx-4 text-center shadow-2xl">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-600 mx-auto mb-5"></div>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">AI正在评分和生成修改版答案</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              {submitStep}
+            </p>
+            {submitProgress > 0 && setData && (
+              <div className="w-full bg-slate-100 rounded-full h-2 mb-2">
+                <div
+                  className="bg-primary-600 h-2 rounded-full transition-all"
+                  style={{ width: `${(submitProgress / setData.questions.length) * 100}%` }}
+                ></div>
+              </div>
+            )}
+            <p className="text-xs text-slate-400 mt-3">预计1-2分钟，请耐心等待</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
