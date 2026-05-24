@@ -22,9 +22,13 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
   const [recordingTime, setRecordingTime] = useState(0)
   const [error, setError] = useState('')
   const [showUnsupported, setShowUnsupported] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [useXfyun, setUseXfyun] = useState(true) // 默认使用讯飞
 
   const recognitionRef = useRef<any>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
   const maxDuration = 360 // 6分钟 = 360秒
 
   // 清理函数
@@ -41,8 +45,17 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
       }
       recognitionRef.current = null
     }
+    if (mediaRecorderRef.current) {
+      try {
+        mediaRecorderRef.current.stop()
+      } catch {
+        // 忽略
+      }
+      mediaRecorderRef.current = null
+    }
     setIsRecording(false)
     setRecordingTime(0)
+    setIsUploading(false)
   }, [])
 
   useEffect(() => {
@@ -58,7 +71,104 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  const startRecording = () => {
+  // 使用讯飞语音识别（服务端代理）
+  const startXfyunRecording = async () => {
+    setError('')
+    setTranscript('')
+    setInterimTranscript('')
+    setRecordingTime(0)
+    audioChunksRef.current = []
+
+    try {
+      // 请求麦克风权限
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+      // 创建MediaRecorder
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = async () => {
+        // 停止所有轨道
+        stream.getTracks().forEach(track => track.stop())
+
+        // 合并音频数据
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+
+        if (audioBlob.size === 0) {
+          setError('录音数据为空')
+          cleanup()
+          return
+        }
+
+        setIsUploading(true)
+
+        try {
+          // 转换为base64
+          const reader = new FileReader()
+          reader.readAsDataURL(audioBlob)
+          reader.onloadend = async () => {
+            const base64 = reader.result as string
+            // 去掉data:audio/webm;base64,前缀
+            const base64Data = base64.split(',')[1]
+
+            // 上传到服务端
+            const token = localStorage.getItem('token')
+            const response = await fetch('/api/voice/xfyun', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({ audio: base64Data }),
+            })
+
+            const result = await response.json()
+
+            if (result.error) {
+              setError(result.error)
+            } else {
+              onTranscript(result.text || '')
+            }
+
+            setIsUploading(false)
+            cleanup()
+          }
+        } catch (err) {
+          setError('上传音频失败')
+          setIsUploading(false)
+          cleanup()
+        }
+      }
+
+      mediaRecorder.start(1000) // 每秒收集一次数据
+      setIsRecording(true)
+
+      // 开始计时
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          if (prev >= maxDuration - 1) {
+            // 到达6分钟上限，自动停止
+            stopRecording()
+            return prev
+          }
+          return prev + 1
+        })
+      }, 1000)
+
+    } catch (err) {
+      setError('无法访问麦克风，请检查权限设置')
+      setIsRecording(false)
+    }
+  }
+
+  // 使用浏览器原生语音识别
+  const startBrowserRecording = () => {
     if (!isSpeechRecognitionSupported()) {
       setShowUnsupported(true)
       return
@@ -139,29 +249,39 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
     }
   }
 
+  const startRecording = () => {
+    if (useXfyun) {
+      startXfyunRecording()
+    } else {
+      startBrowserRecording()
+    }
+  }
+
   const stopRecording = () => {
-    if (recognitionRef.current) {
+    if (useXfyun && mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop()
+    } else if (recognitionRef.current) {
       try {
         recognitionRef.current.stop()
       } catch {
         // 忽略停止时的错误
       }
-    }
 
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
 
-    // 合并最终结果
-    const finalText = transcript + interimTranscript
-    if (finalText.trim()) {
-      onTranscript(finalText.trim())
-    }
+      // 合并最终结果
+      const finalText = transcript + interimTranscript
+      if (finalText.trim()) {
+        onTranscript(finalText.trim())
+      }
 
-    setIsRecording(false)
-    setInterimTranscript('')
-    setRecordingTime(0)
+      setIsRecording(false)
+      setInterimTranscript('')
+      setRecordingTime(0)
+    }
   }
 
   // 不支持浏览器的提示
@@ -199,17 +319,27 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
             {formatTime(recordingTime)} / 06:00
           </span>
 
-          {/* 实时文字预览 */}
-          <span className="text-sm text-slate-600 truncate max-w-[200px]">
-            {interimTranscript || transcript || '正在聆听...'}
-          </span>
+          {/* 实时文字预览（仅浏览器API模式） */}
+          {!useXfyun && (
+            <span className="text-sm text-slate-600 truncate max-w-[200px]">
+              {interimTranscript || transcript || '正在聆听...'}
+            </span>
+          )}
+
+          {/* 上传中提示（讯飞模式） */}
+          {useXfyun && isUploading && (
+            <span className="text-sm text-slate-600">
+              正在识别...
+            </span>
+          )}
 
           {/* 结束按钮 */}
           <button
             onClick={stopRecording}
-            className="ml-auto bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            disabled={isUploading}
+            className="ml-auto bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
           >
-            结束录音
+            {isUploading ? '识别中...' : '结束录音'}
           </button>
         </div>
       )}
@@ -221,29 +351,40 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
 
       {/* 开始录音按钮 */}
       {!isRecording && (
-        <button
-          onClick={startRecording}
-          disabled={disabled}
-          className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="语音答题"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="flex items-center gap-2">
+          <button
+            onClick={startRecording}
+            disabled={disabled}
+            className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="语音答题"
           >
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" x2="12" y1="19" y2="22" />
-          </svg>
-          语音答题
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" x2="12" y1="19" y2="22" />
+            </svg>
+            语音答题
+          </button>
+
+          {/* 切换引擎 */}
+          <button
+            onClick={() => setUseXfyun(!useXfyun)}
+            className="text-xs text-slate-400 hover:text-slate-600 underline"
+            title={useXfyun ? '当前使用讯飞识别（更准确）' : '当前使用浏览器识别（免费）'}
+          >
+            {useXfyun ? '讯飞' : '浏览器'}
+          </button>
+        </div>
       )}
     </div>
   )
