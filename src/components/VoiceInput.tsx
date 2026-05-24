@@ -19,6 +19,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
   const [transcript, setTranscript] = useState('')
   const [error, setError] = useState('')
   const [engine, setEngine] = useState<'aliyun' | 'browser'>('aliyun')
+  const [elapsedTime, setElapsedTime] = useState(0)
 
   // Refs
   const recognitionRef = useRef<any>(null)
@@ -139,11 +140,13 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
         recorder.start(100) // 每100ms发送一次数据
         setIsRecording(true)
         startTimeRef.current = Date.now()
+        setElapsedTime(0)
 
         // 启动定时器
         timerRef.current = setInterval(() => {
-          const elapsed = Date.now() - startTimeRef.current
-          if (elapsed >= MAX_DURATION) {
+          const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000)
+          setElapsedTime(elapsed)
+          if (elapsed * 1000 >= MAX_DURATION) {
             stopRecording()
           }
         }, 1000)
@@ -218,6 +221,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
     cleanup()
     setIsRecording(false)
     setTranscript('')
+    setElapsedTime(0)
   }, [cleanup])
 
   // 开始浏览器原生录音
@@ -349,9 +353,9 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
           </div>
           <span className="text-xs text-red-600 font-medium">录音中</span>
           {/* 计时器 */}
-          {startTimeRef.current > 0 && (
+          {elapsedTime > 0 && (
             <span className="text-xs text-red-500">
-              {Math.floor((Date.now() - startTimeRef.current) / 1000)}s
+              {elapsedTime}s
             </span>
           )}
         </div>
