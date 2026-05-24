@@ -7,13 +7,34 @@ import { requireAuth } from '@/lib/auth'
  * 文档：https://www.xfyun.cn/doc/asr/lfasr/API.html
  */
 
-// MD5哈希函数
+// HmacSHA1签名
+async function hmacSha1(key: string, data: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(key),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  )
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(data))
+  const signatureArray = Array.from(new Uint8Array(signature))
+  return btoa(String.fromCharCode(...signatureArray))
+}
+
+// MD5哈希
 async function md5(message: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(message)
   const hashBuffer = await crypto.subtle.digest('MD5', data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// 生成签名
+async function generateSigna(appId: string, apiSecret: string, timestamp: string): Promise<string> {
+  const baseString = await md5(appId + timestamp)
+  return hmacSha1(apiSecret, baseString)
 }
 
 export async function POST(request: Request) {
@@ -35,123 +56,177 @@ export async function POST(request: Request) {
 
     // 讯飞配置
     const appId = '57c0ec9c'
-    const apiKey = 'b7ed51fb8d8a0bbb7277278f6e120bfb'
     const apiSecret = 'NjQxZjgzNzdlNWZkNjM3NWQ3ZTA0MzI1'
 
-    // 生成签名（录音文件转写API使用MD5签名）
-    // signa = md5(apiKey + ts)
+    // 1. 预处理 - 获取task_id
     const timestamp = Math.floor(Date.now() / 1000).toString()
-    const signa = await md5(apiKey + timestamp)
+    const signa = await generateSigna(appId, apiSecret, timestamp)
 
-    console.log('讯飞请求参数:', {
-      app_id: appId,
-      ts: timestamp,
-      signa: signa.substring(0, 10) + '...',
-      file_len: audio.length,
-    })
+    console.log('讯飞预处理请求:', { app_id: appId, ts: timestamp, signa: signa.substring(0, 10) + '...' })
 
-    // 1. 上传文件获取task_id
-    const uploadResponse = await fetch('https://raasr.xfyun.cn/v2/api/upload', {
+    const prepareResponse = await fetch('https://raasr.xfyun.cn/api/prepare', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       },
-      body: JSON.stringify({
+      body: new URLSearchParams({
         app_id: appId,
         signa: signa,
         ts: timestamp,
-        file_len: audio.length,
+        file_len: audio.length.toString(),
         file_name: 'voice.webm',
-        data: audio,
-        slice_id: 'aaaaaaaaaa',
+        slice_num: '1',
+        language: 'cn',
       }),
+    })
+
+    const prepareResult = await prepareResponse.json()
+    console.log('讯飞预处理结果:', prepareResult)
+
+    if (prepareResult.ok !== 0) {
+      return NextResponse.json(
+        { error: prepareResult.failed || `预处理失败(err_no:${prepareResult.err_no})` },
+        { status: 500 }
+      )
+    }
+
+    const taskId = prepareResult.data
+    if (!taskId) {
+      return NextResponse.json(
+        { error: '未获取到任务ID' },
+        { status: 500 }
+      )
+    }
+
+    // 2. 上传文件（multipart/form-data）
+    const uploadTimestamp = Math.floor(Date.now() / 1000).toString()
+    const uploadSigna = await generateSigna(appId, apiSecret, uploadTimestamp)
+
+    // 将base64转为二进制
+    const audioBuffer = Buffer.from(audio, 'base64')
+
+    const formData = new FormData()
+    formData.append('app_id', appId)
+    formData.append('signa', uploadSigna)
+    formData.append('ts', uploadTimestamp)
+    formData.append('task_id', taskId)
+    formData.append('slice_id', 'aaaaaaaaaa')
+    formData.append('content', new Blob([audioBuffer]))
+
+    const uploadResponse = await fetch('https://raasr.xfyun.cn/api/upload', {
+      method: 'POST',
+      body: formData,
     })
 
     const uploadResult = await uploadResponse.json()
     console.log('讯飞上传结果:', uploadResult)
 
-    if (uploadResult.code !== 0) {
+    if (uploadResult.ok !== 0) {
       return NextResponse.json(
-        { error: uploadResult.desc || uploadResult.message || `上传音频失败(code:${uploadResult.code})` },
+        { error: uploadResult.failed || `上传失败(err_no:${uploadResult.err_no})` },
         { status: 500 }
       )
     }
 
-    const orderId = uploadResult.content?.orderId
-    if (!orderId) {
+    // 3. 合并文件
+    const mergeTimestamp = Math.floor(Date.now() / 1000).toString()
+    const mergeSigna = await generateSigna(appId, apiSecret, mergeTimestamp)
+
+    const mergeResponse = await fetch('https://raasr.xfyun.cn/api/merge', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      },
+      body: new URLSearchParams({
+        app_id: appId,
+        signa: mergeSigna,
+        ts: mergeTimestamp,
+        task_id: taskId,
+      }),
+    })
+
+    const mergeResult = await mergeResponse.json()
+    console.log('讯飞合并结果:', mergeResult)
+
+    if (mergeResult.ok !== 0) {
       return NextResponse.json(
-        { error: '未获取到识别任务ID' },
+        { error: mergeResult.failed || `合并失败(err_no:${mergeResult.err_no})` },
         { status: 500 }
       )
     }
 
-    // 2. 轮询获取结果
+    // 4. 轮询获取结果
     let text = ''
     let attempts = 0
-    const maxAttempts = 15 // 最多轮询15次，每次2秒，共30秒
+    const maxAttempts = 30 // 最多轮询30次，每次2秒，共60秒
 
     while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000))
       attempts++
 
-      // 查询结果需要新的签名
       const queryTimestamp = Math.floor(Date.now() / 1000).toString()
-      const querySigna = await md5(apiKey + queryTimestamp)
+      const querySigna = await generateSigna(appId, apiSecret, queryTimestamp)
 
-      const queryResponse = await fetch('https://raasr.xfyun.cn/v2/api/getResult', {
+      // 查询进度
+      const progressResponse = await fetch('https://raasr.xfyun.cn/api/getProgress', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         },
-        body: JSON.stringify({
+        body: new URLSearchParams({
           app_id: appId,
           signa: querySigna,
           ts: queryTimestamp,
-          orderId: orderId,
+          task_id: taskId,
         }),
       })
 
-      const queryResult = await queryResponse.json()
-      console.log(`讯飞查询结果(${attempts}):`, queryResult)
+      const progressResult = await progressResponse.json()
+      console.log(`讯飞进度查询(${attempts}):`, progressResult)
 
-      if (queryResult.code !== 0) {
-        continue // 继续轮询
+      if (progressResult.ok !== 0) {
+        continue
       }
 
-      // 解析结果
-      if (queryResult.content?.orderResult) {
-        try {
-          const orderResult = JSON.parse(queryResult.content.orderResult)
-          if (orderResult.lattice && orderResult.lattice.length > 0) {
-            text = ''
-            for (const lattice of orderResult.lattice) {
-              if (lattice.json_1best) {
-                const best = JSON.parse(lattice.json_1best)
-                if (best.st?.rt) {
-                  for (const rt of best.st.rt) {
-                    if (rt.ws) {
-                      for (const ws of rt.ws) {
-                        if (ws.cw) {
-                          for (const cw of ws.cw) {
-                            text += cw.w || ''
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+      const progressData = JSON.parse(progressResult.data || '{}')
+      
+      // 状态码：9表示转写结果上传完成
+      if (progressData.status === 9) {
+        // 获取结果
+        const resultTimestamp = Math.floor(Date.now() / 1000).toString()
+        const resultSigna = await generateSigna(appId, apiSecret, resultTimestamp)
+
+        const resultResponse = await fetch('https://raasr.xfyun.cn/api/getResult', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          },
+          body: new URLSearchParams({
+            app_id: appId,
+            signa: resultSigna,
+            ts: resultTimestamp,
+            task_id: taskId,
+          }),
+        })
+
+        const resultData = await resultResponse.json()
+        console.log('讯飞最终结果:', resultData)
+
+        if (resultData.ok === 0 && resultData.data) {
+          const results = JSON.parse(resultData.data)
+          if (Array.isArray(results)) {
+            text = results.map((item: any) => item.onebest || '').join('')
           }
-        } catch (e) {
-          console.error('解析结果失败:', e)
         }
+        break
       }
 
-      // 检查任务状态
-      if (queryResult.content?.orderStatus === 3) {
-        // 任务完成
-        break
+      // 状态码：-1表示失败
+      if (progressData.status === -1) {
+        return NextResponse.json(
+          { error: progressData.desc || '转写失败' },
+          { status: 500 }
+        )
       }
     }
 
