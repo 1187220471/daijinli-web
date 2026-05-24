@@ -1,12 +1,10 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { XfyunASR } from 'xfyun-sdk'
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void
   disabled?: boolean
-  mode?: 'xfyun' | 'browser'
 }
 
 // 检测浏览器是否支持Web Speech API
@@ -15,18 +13,15 @@ const isBrowserSpeechSupported = () => {
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
 }
 
-export default function VoiceInput({ onTranscript, disabled, mode = 'browser' }: VoiceInputProps) {
+export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [error, setError] = useState('')
-  const [engine, setEngine] = useState<'xfyun' | 'browser'>(mode)
-  const [showTips, setShowTips] = useState(false)
 
   // Refs
   const recognitionRef = useRef<any>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const startTimeRef = useRef<number>(0)
-  const xfyunRecognizerRef = useRef<any>(null)
 
   // 6分钟超时
   const MAX_DURATION = 6 * 60 * 1000
@@ -43,24 +38,20 @@ export default function VoiceInput({ onTranscript, disabled, mode = 'browser' }:
       } catch (e) {}
       recognitionRef.current = null
     }
-    if (xfyunRecognizerRef.current) {
-      try {
-        xfyunRecognizerRef.current.destroy()
-      } catch (e) {}
-      xfyunRecognizerRef.current = null
-    }
   }, [])
 
   useEffect(() => {
     return cleanup
   }, [cleanup])
 
-  // 开始浏览器原生录音
-  const startBrowserRecognition = useCallback(() => {
+  // 开始录音
+  const startRecording = useCallback(() => {
+    setError('')
+
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
       setError('您的浏览器不支持语音功能，请更换Chrome或Edge浏览器')
-      return false
+      return
     }
 
     const recognition = new SpeechRecognition()
@@ -108,7 +99,6 @@ export default function VoiceInput({ onTranscript, disabled, mode = 'browser' }:
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error)
       if (event.error === 'no-speech') {
-        // 无语音输入，可以继续
         return
       }
       if (event.error === 'not-allowed') {
@@ -127,11 +117,10 @@ export default function VoiceInput({ onTranscript, disabled, mode = 'browser' }:
 
     recognitionRef.current = recognition
     recognition.start()
-    return true
   }, [onTranscript, cleanup])
 
-  // 停止浏览器原生录音
-  const stopBrowserRecognition = useCallback(() => {
+  // 停止录音
+  const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop()
       recognitionRef.current = null
@@ -147,117 +136,6 @@ export default function VoiceInput({ onTranscript, disabled, mode = 'browser' }:
     setIsRecording(false)
     setTranscript('')
   }, [transcript, onTranscript])
-
-  // 开始讯飞录音
-  const startXfyunRecognition = useCallback(async () => {
-    try {
-      const recognizer = new XfyunASR({
-        appId: '57c0ec9c',
-        apiKey: 'b7ed51fb8d8a0bbb7277278f6e120bfb',
-        apiSecret: 'NjQxZjgzNzdlNWZkNjM3NWQ3ZTA0MzI1',
-        language: 'zh_cn',
-        domain: 'iat',
-        accent: 'mandarin',
-        vadEos: 5000, // 5秒静音停止
-        enableReconnect: false,
-        maxAudioSize: 30 * 1024 * 1024, // 30MB
-      }, {
-        onStart: () => {
-          setIsRecording(true)
-          setError('')
-          setTranscript('')
-          startTimeRef.current = Date.now()
-
-          // 启动定时器，6分钟超时
-          timerRef.current = setInterval(() => {
-            const elapsed = Date.now() - startTimeRef.current
-            if (elapsed >= MAX_DURATION) {
-              stopRecording()
-            }
-          }, 1000)
-        },
-        onRecognitionResult: (text: string, isEnd: boolean) => {
-          console.log('讯飞识别结果:', text, isEnd)
-          setTranscript(text)
-          if (isEnd) {
-            onTranscript(text)
-            setTranscript('')
-          }
-        },
-        onProcess: (volume: number) => {
-          // 音量回调，可用于显示音量指示
-        },
-        onError: (err: any) => {
-          console.error('讯飞识别错误:', err)
-          setError(`讯飞识别错误: ${err.message || err.desc || '未知错误'}`)
-          setIsRecording(false)
-          cleanup()
-        },
-        onStateChange: (state: string) => {
-          console.log('讯飞状态:', state)
-        }
-      })
-
-      xfyunRecognizerRef.current = recognizer
-
-      await recognizer.start()
-
-    } catch (err: any) {
-      console.error('启动讯飞识别失败:', err)
-      setError(`启动讯飞识别失败: ${err.message || '未知错误'}`)
-      cleanup()
-    }
-  }, [onTranscript, cleanup])
-
-  // 停止讯飞录音
-  const stopXfyunRecognition = useCallback(async () => {
-    if (xfyunRecognizerRef.current) {
-      try {
-        await xfyunRecognizerRef.current.stop()
-        // 如果还有临时文字没发送，发送它
-        if (transcript) {
-          onTranscript(transcript)
-        }
-      } catch (err) {
-        console.error('停止讯飞识别失败:', err)
-      }
-      xfyunRecognizerRef.current = null
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-    setIsRecording(false)
-    setTranscript('')
-  }, [transcript, onTranscript])
-
-  // 开始录音
-  const startRecording = useCallback(async () => {
-    setError('')
-
-    if (engine === 'xfyun') {
-      await startXfyunRecognition()
-    } else {
-      startBrowserRecognition()
-    }
-  }, [engine, startBrowserRecognition, startXfyunRecognition])
-
-  // 停止录音
-  const stopRecording = useCallback(async () => {
-    if (engine === 'xfyun') {
-      await stopXfyunRecognition()
-    } else {
-      stopBrowserRecognition()
-    }
-  }, [engine, stopBrowserRecognition, stopXfyunRecognition])
-
-  // 切换引擎
-  const toggleEngine = useCallback(() => {
-    if (isRecording) return
-    const newEngine = engine === 'browser' ? 'xfyun' : 'browser'
-    setEngine(newEngine)
-    setShowTips(newEngine === 'xfyun')
-  }, [engine, isRecording])
 
   // 渲染
   return (
@@ -279,18 +157,6 @@ export default function VoiceInput({ onTranscript, disabled, mode = 'browser' }:
             </span>
           )}
         </div>
-      )}
-
-      {/* 切换引擎按钮 */}
-      {!disabled && (
-        <button
-          onClick={toggleEngine}
-          disabled={isRecording}
-          className="text-xs px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50"
-          title="切换语音引擎"
-        >
-          {engine === 'xfyun' ? '讯飞' : '浏览器'}
-        </button>
       )}
 
       {/* 主按钮 */}
