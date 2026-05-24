@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getAuthHeaders } from '@/lib/auth'
 import VoiceInput from '@/components/VoiceInput'
@@ -34,6 +34,15 @@ export default function SetAnswerPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitStep, setSubmitStep] = useState('')
   const [submitProgress, setSubmitProgress] = useState(0)
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false)
+  const voicePreviewRef = useRef<HTMLDivElement>(null)
+
+  // 语音预览框自动滚动到底部
+  useEffect(() => {
+    if (voicePreviewRef.current) {
+      voicePreviewRef.current.scrollTop = voicePreviewRef.current.scrollHeight
+    }
+  }, [currentAnswer])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -313,8 +322,19 @@ export default function SetAnswerPage() {
               <VoiceInput
                 onTranscript={(text) => setCurrentAnswer((prev) => prev + text)}
                 disabled={submitting}
+                onRecordingChange={setIsVoiceRecording}
               />
             </div>
+            {/* 语音实时转写预览 - 缩小尺寸，放在右侧 */}
+            {isVoiceRecording && (
+              <div
+                ref={voicePreviewRef}
+                className="w-1/2 ml-auto mb-3 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg text-sm text-slate-700"
+                style={{ height: 48, overflowY: 'hidden', overflowX: 'hidden', wordBreak: 'break-all' }}
+              >
+                {currentAnswer || '等待语音识别...'}
+              </div>
+            )}
             <textarea
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}

@@ -6,6 +6,7 @@ import { getAuthHeaders } from '@/lib/auth'
 interface VoiceInputProps {
   onTranscript: (text: string) => void
   disabled?: boolean
+  onRecordingChange?: (recording: boolean) => void
 }
 
 // 检测浏览器是否支持Web Speech API
@@ -14,7 +15,7 @@ const isBrowserSpeechSupported = () => {
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
 }
 
-export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
+export default function VoiceInput({ onTranscript, disabled, onRecordingChange }: VoiceInputProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [error, setError] = useState('')
@@ -83,6 +84,11 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
   useEffect(() => {
     return cleanup
   }, [cleanup])
+
+  // 录音状态变化时通知父组件
+  useEffect(() => {
+    onRecordingChange?.(isRecording)
+  }, [isRecording, onRecordingChange])
 
   // 开始阿里云录音
   const startAliyunRecording = useCallback(async () => {
@@ -437,7 +443,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
 
   // 渲染
   return (
-    <div className="flex flex-col gap-2">
+    <div className="relative inline-block">
       <div className="inline-flex items-center gap-2">
       {isRecording && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
@@ -500,13 +506,6 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
       {error && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-100 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm shadow-lg z-50">
           {error}
-        </div>
-      )}
-
-      {/* 实时语音转写结果 */}
-      {isRecording && transcript && (
-        <div className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg text-sm text-slate-700 max-h-20 overflow-y-auto">
-          {transcript}
         </div>
       )}
     </div>

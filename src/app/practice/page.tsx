@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getAuthHeaders } from '@/lib/auth'
 import { QUESTION_TYPE_LABELS } from '@/types'
@@ -29,6 +29,15 @@ export default function Practice() {
   const [step, setStep] = useState<'select' | 'question' | 'answer' | 'result'>('select')
   const [showVipModal, setShowVipModal] = useState(false)
   const [setLoadingMode, setSetLoadingMode] = useState<string | null>(null)
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false)
+  const voicePreviewRef = useRef<HTMLDivElement>(null)
+
+  // 语音预览框自动滚动到底部
+  useEffect(() => {
+    if (voicePreviewRef.current) {
+      voicePreviewRef.current.scrollTop = voicePreviewRef.current.scrollHeight
+    }
+  }, [userAnswer])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -305,8 +314,19 @@ export default function Practice() {
                   <VoiceInput
                     onTranscript={(text) => setUserAnswer((prev) => prev + text)}
                     disabled={loading}
+                    onRecordingChange={setIsVoiceRecording}
                   />
                 </div>
+                {/* 语音实时转写预览 - 缩小尺寸，放在右侧 */}
+                {isVoiceRecording && (
+                  <div
+                    ref={voicePreviewRef}
+                    className="w-1/2 ml-auto mb-3 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg text-sm text-slate-700"
+                    style={{ height: 48, overflowY: 'hidden', overflowX: 'hidden', wordBreak: 'break-all' }}
+                  >
+                    {userAnswer || '等待语音识别...'}
+                  </div>
+                )}
                 <textarea
                   value={userAnswer}
                   onChange={(e) => setUserAnswer(e.target.value)}
