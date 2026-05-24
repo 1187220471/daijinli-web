@@ -3,8 +3,19 @@ import { requireAuth } from '@/lib/auth'
 
 /**
  * 讯飞语音识别API代理
- * 接收音频base64，调用讯飞API，返回文字
+ * 使用录音文件转写API（支持webm格式）
+ * 文档：https://www.xfyun.cn/doc/asr/lfasr/API.html
  */
+
+// MD5哈希函数
+async function md5(message: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(message)
+  const hashBuffer = await crypto.subtle.digest('MD5', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 export async function POST(request: Request) {
   try {
     // 认证
@@ -27,31 +38,27 @@ export async function POST(request: Request) {
     const apiKey = 'b7ed51fb8d8a0bbb7277278f6e120bfb'
     const apiSecret = 'NjQxZjgzNzdlNWZkNjM3NWQ3ZTA0MzI1'
 
-    // 生成签名
+    // 生成签名（录音文件转写API使用MD5签名）
+    // signa = md5(apiKey + ts)
     const timestamp = Math.floor(Date.now() / 1000).toString()
-    const signatureOrigin = apiKey + timestamp
-    const encoder = new TextEncoder()
+    const signa = await md5(apiKey + timestamp)
 
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(apiSecret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    )
-    const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(signatureOrigin))
-    const signatureArray = Array.from(new Uint8Array(signatureBuffer))
-    const signature = btoa(String.fromCharCode(...signatureArray))
+    console.log('讯飞请求参数:', {
+      app_id: appId,
+      ts: timestamp,
+      signa: signa.substring(0, 10) + '...',
+      file_len: audio.length,
+    })
 
-    // 调用讯飞API
-    const response = await fetch('https://raasr.xfyun.cn/v2/api/upload', {
+    // 1. 上传文件获取task_id
+    const uploadResponse = await fetch('https://raasr.xfyun.cn/v2/api/upload', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         app_id: appId,
-        signa: signature,
+        signa: signa,
         ts: timestamp,
         file_len: audio.length,
         file_name: 'voice.webm',
@@ -60,18 +67,17 @@ export async function POST(request: Request) {
       }),
     })
 
-    const result = await response.json()
+    const uploadResult = await uploadResponse.json()
+    console.log('讯飞上传结果:', uploadResult)
 
-    if (result.code !== 0) {
-      console.error('讯飞识别失败:', result)
+    if (uploadResult.code !== 0) {
       return NextResponse.json(
-        { error: result.desc || result.message || '识别失败' },
+        { error: uploadResult.desc || uploadResult.message || `上传音频失败(code:${uploadResult.code})` },
         { status: 500 }
       )
     }
 
-    // 讯飞返回的是任务ID，需要轮询获取结果
-    const orderId = result.content?.orderId
+    const orderId = uploadResult.content?.orderId
     if (!orderId) {
       return NextResponse.json(
         { error: '未获取到识别任务ID' },
@@ -79,10 +85,18 @@ export async function POST(request: Request) {
       )
     }
 
-    // 轮询获取结果（最多轮询10次，每次2秒）
+    // 2. 轮询获取结果
     let text = ''
-    for (let i = 0; i < 10; i++) {
+    let attempts = 0
+    const maxAttempts = 15 // 最多轮询15次，每次2秒，共30秒
+
+    while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000))
+      attempts++
+
+      // 查询结果需要新的签名
+      const queryTimestamp = Math.floor(Date.now() / 1000).toString()
+      const querySigna = await md5(apiKey + queryTimestamp)
 
       const queryResponse = await fetch('https://raasr.xfyun.cn/v2/api/getResult', {
         method: 'POST',
@@ -91,45 +105,58 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           app_id: appId,
-          signa: signature,
-          ts: timestamp,
+          signa: querySigna,
+          ts: queryTimestamp,
           orderId: orderId,
-          result_id: orderId,
         }),
       })
 
       const queryResult = await queryResponse.json()
+      console.log(`讯飞查询结果(${attempts}):`, queryResult)
 
-      if (queryResult.code === 0 && queryResult.content?.orderResult) {
+      if (queryResult.code !== 0) {
+        continue // 继续轮询
+      }
+
+      // 解析结果
+      if (queryResult.content?.orderResult) {
         try {
           const orderResult = JSON.parse(queryResult.content.orderResult)
           if (orderResult.lattice && orderResult.lattice.length > 0) {
-            const lattice = orderResult.lattice[0]
-            const json_1best = JSON.parse(lattice.json_1best)
-            if (json_1best.st && json_1best.st.rt) {
-              for (const rt of json_1best.st.rt) {
-                for (const ws of rt.ws) {
-                  for (const cw of ws.cw) {
-                    text += cw.w
+            text = ''
+            for (const lattice of orderResult.lattice) {
+              if (lattice.json_1best) {
+                const best = JSON.parse(lattice.json_1best)
+                if (best.st?.rt) {
+                  for (const rt of best.st.rt) {
+                    if (rt.ws) {
+                      for (const ws of rt.ws) {
+                        if (ws.cw) {
+                          for (const cw of ws.cw) {
+                            text += cw.w || ''
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
             }
           }
-
-          // 如果任务完成，直接返回
-          if (queryResult.content.orderStatus === 3) {
-            break
-          }
-        } catch {
-          // 解析失败，继续轮询
+        } catch (e) {
+          console.error('解析结果失败:', e)
         }
+      }
+
+      // 检查任务状态
+      if (queryResult.content?.orderStatus === 3) {
+        // 任务完成
+        break
       }
     }
 
     return NextResponse.json({
       text: text || '识别结果为空',
-      orderId,
     })
 
   } catch (error) {
