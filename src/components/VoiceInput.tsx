@@ -93,9 +93,9 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
       ws.onopen = () => {
         console.log('阿里云WebSocket连接成功')
 
-        // 生成符合阿里云要求的ID（16位十六进制字符串）
+        // 生成符合阿里云要求的ID（32位十六进制字符串，不带横线）
         const generateId = () => {
-          return Array.from({length: 16}, () => 
+          return Array.from({length: 32}, () => 
             Math.floor(Math.random() * 16).toString(16)
           ).join('')
         }
