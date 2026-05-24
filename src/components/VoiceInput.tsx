@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { XfyunASR } from 'xfyun-sdk'
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void
@@ -150,9 +151,6 @@ export default function VoiceInput({ onTranscript, disabled, mode = 'browser' }:
   // 开始讯飞录音
   const startXfyunRecognition = useCallback(async () => {
     try {
-      // 动态导入SDK
-      const { XfyunASR } = await import('xfyun-sdk')
-
       const recognizer = new XfyunASR({
         appId: '57c0ec9c',
         apiKey: 'b7ed51fb8d8a0bbb7277278f6e120bfb',
