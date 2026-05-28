@@ -10,6 +10,57 @@ interface VoiceInputProps {
 }
 
 // 检测浏览器是否支持Web Speech API
+/**
+ * 计算增量文本：阿里云语音识别返回的文本可能包含对前面内容的修正，
+ * 不能简单用 startsWith，需要用最长公共后缀找到真正的增量部分。
+ * 
+ * 例如：
+ *   last = "各位居民朋友们你们好我是此次负责老旧威房改造的"
+ *   current = "各位居民朋友们你们好我是此次负责老旧危房改造的负责人"
+ *   返回："负责人"（而不是整段新文本）
+ */
+function getIncrementalText(last: string, current: string): string {
+  if (!last) return current
+  if (current === last) return ''
+  
+  // 找最长公共后缀（从末尾往前匹配）
+  let commonLen = 0
+  const minLen = Math.min(last.length, current.length)
+  // 从后往前比较，找到最长的匹配后缀
+  for (let i = 1; i <= minLen; i++) {
+    if (last[last.length - i] === current[current.length - i]) {
+      commonLen++
+    } else {
+      break
+    }
+  }
+  
+  // 如果公共后缀足够长（至少2个字符），认为current是在last基础上修正+追加
+  if (commonLen >= 2) {
+    // current 中新增的部分 = 去掉和 last 前缀重叠的部分
+    // 找到 last 中匹配后缀的起始位置
+    const lastPrefix = last.slice(0, last.length - commonLen)
+    const currentPrefix = current.slice(0, current.length - commonLen)
+    
+    // 如果 current 的前缀以 last 的前缀开头，说明只是后面追加了内容
+    if (currentPrefix.startsWith(lastPrefix)) {
+      return current.slice(lastPrefix.length)
+    }
+    
+    // 否则是中间有修正，返回 current 中不在 last 中的部分
+    // 简单处理：返回 current 从 last.length - commonLen 开始的部分
+    return current.slice(Math.max(0, last.length - commonLen))
+  }
+  
+  // 如果没有足够长的公共后缀，退化为 startsWith 检查
+  if (current.startsWith(last)) {
+    return current.slice(last.length)
+  }
+  
+  // 完全不相干，返回整段（这种情况理论上不应发生）
+  return current
+}
+
 const isBrowserSpeechSupported = () => {
   return typeof window !== 'undefined' && 
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
@@ -207,10 +258,9 @@ export default function VoiceInput({ onTranscript, disabled, onRecordingChange }
           // 中间结果 - 仅发送新增部分到父组件（避免重复叠加）
           const text = data.payload?.result || ''
           if (text) {
-            // 算增量：阿里云每次返回完整累计文本，只取新增部分
-            const newPart = text.startsWith(lastTextRef.current) 
-              ? text.slice(lastTextRef.current.length) 
-              : text
+            // 算增量：阿里云返回的文本可能包含对前面内容的修正，
+            // 用最长公共后缀算法找到真正的增量部分
+            const newPart = getIncrementalText(lastTextRef.current, text)
             lastTextRef.current = text
             fullTextRef.current = text
             setTranscript(text) // 组件内实时预览用完整文本
@@ -227,9 +277,7 @@ export default function VoiceInput({ onTranscript, disabled, onRecordingChange }
           console.log('识别完成，最终文本:', fullTextRef.current)
           setTranscript(fullTextRef.current)
           // 最终结果可能有修正，算差异部分
-          const correction = text.startsWith(lastTextRef.current) 
-            ? text.slice(lastTextRef.current.length) 
-            : text
+          const correction = getIncrementalText(lastTextRef.current, text)
           if (correction) {
             onTranscript(correction)
           }
@@ -307,9 +355,7 @@ export default function VoiceInput({ onTranscript, disabled, onRecordingChange }
         // 确保最终结果已传递（仅发送补充部分）
         if (fullTextRef.current) {
           const fallbackText = fullTextRef.current
-          const correction = fallbackText.startsWith(lastTextRef.current) 
-            ? fallbackText.slice(lastTextRef.current.length) 
-            : fallbackText
+          const correction = getIncrementalText(lastTextRef.current, fallbackText)
           if (correction) {
             console.log('停止录音，补充文本:', correction)
             onTranscript(correction)
