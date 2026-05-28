@@ -60,7 +60,7 @@ export default function AudioUploader({ onTranscript, disabled }: AudioUploaderP
       let audioStarted = false // 标记是否已开始发送音频数据
 
       ws.onopen = () => {
-        console.log(`[段${segmentIndex + 1}] WebSocket已连接，发送StartRecognition`)
+        console.log(`[段${segmentIndex + 1}] WebSocket已连接, appKey="${appKey}", 长度=${appKey?.length || 0}`)
         const startCmd = {
           header: {
             message_id: generateId(),
@@ -77,7 +77,9 @@ export default function AudioUploader({ onTranscript, disabled }: AudioUploaderP
             enable_inverse_text_normalization: true,
           },
         }
-        ws.send(JSON.stringify(startCmd))
+        const cmdStr = JSON.stringify(startCmd)
+        console.log(`[段${segmentIndex + 1}] StartRecognition命令:`, cmdStr)
+        ws.send(cmdStr)
         // ⚠️ 不在这里发送音频数据！
         // 必须等收到 RecognitionStarted 后才发送（见 onmessage）
       }
