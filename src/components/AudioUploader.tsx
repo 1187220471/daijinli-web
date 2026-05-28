@@ -91,10 +91,23 @@ export default function AudioUploader({ onTranscript, disabled }: AudioUploaderP
       }
 
       ws.onmessage = (event) => {
-        const data = JSON.parse(event.data)
+        // 打印完整的原始消息用于调试
+        console.log(`[段${segmentIndex + 1}] 阿里云原始消息:`, event.data)
+        let data: any
+        try {
+          data = JSON.parse(event.data)
+        } catch {
+          console.warn(`[段${segmentIndex + 1}] ⚠️ 无法解析:`, event.data)
+          return
+        }
         const name = data.header?.name
+        const statusCode = data.header?.status_code || ''
+        const statusText = data.header?.status_text || ''
+        console.log(`[段${segmentIndex + 1}] 类型=${name}, 状态码=${statusCode}, 状态=${statusText}`)
 
-        if (name === 'RecognitionResultChanged') {
+        if (name === 'RecognitionStarted') {
+          console.log(`[段${segmentIndex + 1}] ✅ 识别已开始`)
+        } else if (name === 'RecognitionResultChanged') {
           const text = data.payload?.result || ''
           if (text) {
             segmentFullText = text
@@ -113,14 +126,24 @@ export default function AudioUploader({ onTranscript, disabled }: AudioUploaderP
           ws.close()
           safeResolve(segmentFullText)
         } else if (name === 'TaskFailed' || name === 'Error') {
-          const errMsg = data.payload?.message || data.header?.status_message || '段识别失败'
+          const errMsg = data.payload?.message || data.payload?.status_text || data.header?.status_message || ''
+          const errCode = data.header?.status_code || ''
+          console.error(`[段${segmentIndex + 1}] ❌ 阿里云错误: 码=${errCode}, 消息=${errMsg}`)
+          console.error(`[段${segmentIndex + 1}] ❌ 完整错误数据:`, JSON.stringify(data, null, 2))
           clearTimeout(timeoutId)
-          safeReject(new Error(`第${segmentIndex + 1}段: ${errMsg}`))
+          safeReject(new Error(`第${segmentIndex + 1}段: [${errCode}] ${errMsg}`))
+        } else {
+          // 打印未处理的消息类型
+          console.log(`[段${segmentIndex + 1}] 🔔 未处理消息:`, JSON.stringify(data, null, 2))
         }
       }
 
-      ws.onerror = () => safeReject(new Error(`第${segmentIndex + 1}段WebSocket连接错误`))
-      ws.onclose = () => {
+      ws.onerror = (error) => {
+        console.error(`[段${segmentIndex + 1}] 🔌 WebSocket error事件:`, error)
+        safeReject(new Error(`第${segmentIndex + 1}段WebSocket连接错误`))
+      }
+      ws.onclose = (closeEvent) => {
+        console.log(`[段${segmentIndex + 1}] 🔒 WebSocket关闭: 码=${closeEvent.code}, 原因="${closeEvent.reason}", 已识别文本="${segmentFullText}"`)
         clearTimeout(timeoutId)
         if (!isDone) safeResolve(segmentFullText)
       }
