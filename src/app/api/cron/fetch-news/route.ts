@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 
+// 强制动态渲染，防止边缘缓存导致日期错误
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+
 const prisma = new PrismaClient()
 
 // ============ 网站配置 ============
@@ -283,7 +287,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 检查今天是否已经有数据，防止重复执行（Vercel Cron 漂移或本地构建触发）
-    const today = new Date().toISOString().split('T')[0]
+    // 使用北京时间（UTC+8）
+    const now = new Date()
+    const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+    const today = beijingTime.toISOString().split('T')[0]
     const existing = await prisma.dailyNews.findUnique({
       where: { date: today },
     })
