@@ -114,7 +114,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
           <button
             onClick={() => router.push('/practice')}
             className="bg-primary-600 hover:bg-primary-700 text-white p-8 rounded-2xl shadow-lg transition-all hover:shadow-xl text-left group"
@@ -156,6 +156,18 @@ export default function Home() {
             <h3 className="text-xl font-bold mb-2">每日政务要闻</h3>
             <p className="text-slate-500 text-sm">
               每天19:00自动抓取江苏政务新闻，AI精选公考备考素材
+            </p>
+          </button>
+
+          <button
+            onClick={() => router.push('/zhenti')}
+            className="bg-white hover:bg-slate-50 text-slate-800 p-8 rounded-2xl shadow-lg transition-all hover:shadow-xl text-left border border-slate-200 group relative overflow-hidden"
+          >
+            <div className="absolute top-3 right-3 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">2008-2026</div>
+            <div className="text-4xl mb-4">📜</div>
+            <h3 className="text-xl font-bold mb-2">真题复盘</h3>
+            <p className="text-slate-500 text-sm">
+              江苏省考历年真题 + AI三答对比 + 汇总参考答案
             </p>
           </button>
         </div>

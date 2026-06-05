@@ -76,3 +76,44 @@ model CronExecutionLog {
 
   @@index([jobName, createdAt])
 }
+
+// 真题复盘模块
+model ZhentiQuestion {
+  id              Int      @id @default(autoincrement())
+  examTitle       String   // 考试场次，如"2024年3月9日江苏省考面试题（A类）"
+  examYear        Int      // 年份，如 2024
+  examDate        String   // 日期字符串，如"2024-03-09"
+  examCategory    String?  // 类别：A类/B类/C类/公安系统/无锡等
+  questionNumber  Int      // 第几题
+  questionText    String   // 题目原文
+  questionType    String   @default("未分类") // 题型（社会现象/组织管理等）
+  answer1         String   // temperature=0.9 的答案
+  answer2         String   // temperature=0.7 的答案
+  answer3         String   // temperature=0.5 的答案
+  score1          Int      // 答案1得分
+  score2          Int      // 答案2得分
+  score3          Int      // 答案3得分
+  comparison      String   // 评分对比JSON（字符串存储）
+  finalAnswer     String   // 汇总版参考答案
+  finalWordCount  Int      @default(0)
+  createdAt       DateTime @default(now())
+  bookmarks       ZhentiBookmark[]
+
+  @@index([examYear])
+  @@index([examDate])
+  @@map("zhenti_question")
+}
+
+model ZhentiBookmark {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  questionId  Int
+  proficiency String   @default("weak") // weak / okay / mastered
+  notes       String?
+  createdAt   DateTime @default(now())
+  question    ZhentiQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("zhenti_bookmark")
+}

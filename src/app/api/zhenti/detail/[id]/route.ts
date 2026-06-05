@@ -1,0 +1,56 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
+
+export const dynamic = 'force-dynamic'
+
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const auth = requireAuth(request)
+    if (!auth.success) {
+      return auth.response
+    }
+
+    const id = parseInt(params.id)
+    if (isNaN(id)) {
+      return NextResponse.json({ error: '参数错误' }, { status: 400 })
+    }
+
+    const question = await prisma.zhentiQuestion.findUnique({
+      where: { id },
+    })
+
+    if (!question) {
+      return NextResponse.json({ error: '题目不存在' }, { status: 404 })
+    }
+
+    // 获取收藏状态
+    const bookmark = await prisma.zhentiBookmark.findUnique({
+      where: { userId_questionId: { userId: auth.userId, questionId: id } },
+    })
+
+    // 获取同场次的其他题目（用于导航）
+    const siblings = await prisma.zhentiQuestion.findMany({
+      where: { examDate: question.examDate, examCategory: question.examCategory },
+      select: { id: true, questionNumber: true },
+      orderBy: { questionNumber: 'asc' },
+    })
+
+    return NextResponse.json({
+      question: {
+        ...question,
+        comparison: JSON.parse(question.comparison || '{}'),
+      },
+      bookmark: bookmark
+        ? { proficiency: bookmark.proficiency, notes: bookmark.notes }
+        : null,
+      siblings,
+    })
+  } catch (error) {
+    console.error('Zhenti detail error:', error)
+    return NextResponse.json({ error: '获取题目详情失败' }, { status: 500 })
+  }
+}
