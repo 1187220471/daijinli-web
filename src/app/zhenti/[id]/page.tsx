@@ -35,6 +35,7 @@ interface ZhentiDetail {
   }
   finalAnswer: string
   finalWordCount: number
+  imageUrl: string | null
 }
 
 interface SiblingItem {
@@ -232,6 +233,16 @@ export default function ZhentiDetailPage() {
           <p className="text-slate-800 leading-relaxed text-base">
             {question.questionText}
           </p>
+          {question.imageUrl && (
+            <div className="mt-4">
+              <img
+                src={question.imageUrl}
+                alt="题目配图"
+                className="max-w-full rounded-lg border border-slate-200"
+                style={{ maxHeight: '400px' }}
+              />
+            </div>
+          )}
         </div>
 
         {/* 掌握度标记 */}

@@ -96,6 +96,7 @@ model ZhentiQuestion {
   comparison      String   // 评分对比JSON（字符串存储）
   finalAnswer     String   // 汇总版参考答案
   finalWordCount  Int      @default(0)
+  imageUrl        String?  // 题目配图URL（漫画/图表/照片等）
   createdAt       DateTime @default(now())
   bookmarks       ZhentiBookmark[]
 

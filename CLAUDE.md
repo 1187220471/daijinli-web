@@ -4,7 +4,7 @@
 Next.js 14 + React 18 + TypeScript + Tailwind + Prisma + Neon PostgreSQL（生产）/ SQLite（本地dev）+ DeepSeek API + 阿里云语音识别
 
 ## 核心功能
-AI出题(8题型)→AI参考答案→AI批改(六维度+改进版答案)→自定义题目(答题+批改)→套题训练(邀请用户)→用户系统+练习记录
+AI出题(8题型)→AI参考答案→AI批改(六维度+改进版答案)→自定义题目(答题+批改)→套题训练(邀请用户)→真题复盘(198题，AI三答对比+汇总参考答案)→用户系统+练习记录
 
 ### 额度（src/lib/quota.ts）
 - 免费：每日5次（出题不扣，答案/批改扣）
@@ -48,6 +48,12 @@ DATABASE_URL / JWT_SECRET / DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL / ALIYUN_ACCESS
 | 邀请码生成 | `scripts/generate-invite-codes-neon.js` |
 | 批改API | `src/app/api/evaluate/route.ts` |
 | 自定义题目 | `src/app/custom-question/page.tsx` |
+| 真题复盘列表 | `src/app/zhenti/page.tsx` |
+| 真题复盘详情 | `src/app/zhenti/[id]/page.tsx` |
+| 真题API列表 | `src/app/api/zhenti/list/route.ts` |
+| 真题API详情 | `src/app/api/zhenti/detail/[id]/route.ts` |
+| 真题API收藏 | `src/app/api/zhenti/bookmark/route.ts` |
+| 真题数据入库 | `prisma/seed-zhenti.ts`（幂等，从 `/tmp/zhenti_batch/*.json` 解析） |
 
 ## 本地开发
 ```bash
