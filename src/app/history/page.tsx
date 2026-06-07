@@ -66,13 +66,23 @@ export default function History() {
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2 text-slate-800"
-          >
-            <span className="text-2xl">🐻</span>
-            <span className="font-bold">江苏公务员面试答题训练</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-primary-600 transition-colors"
+            >
+              <span>←</span>
+              <span>首页</span>
+            </button>
+            <div className="w-px h-4 bg-slate-200" />
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-2 text-slate-800"
+            >
+              <span className="text-2xl">🐻</span>
+              <span className="font-bold hidden sm:inline">江苏公务员面试答题训练</span>
+            </button>
+          </div>
           <span className="text-sm text-slate-500">练习记录</span>
         </div>
       </header>

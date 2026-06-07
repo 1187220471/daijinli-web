@@ -180,12 +180,22 @@ export default function ZhentiDetailPage() {
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-20">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={() => router.push('/zhenti')}
-            className="text-slate-500 hover:text-slate-800 transition-colors"
-          >
-            ← 返回
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-primary-600 transition-colors"
+            >
+              <span>←</span>
+              <span>首页</span>
+            </button>
+            <div className="w-px h-4 bg-slate-200" />
+            <button
+              onClick={() => router.push('/zhenti')}
+              className="text-slate-500 hover:text-slate-800 transition-colors text-sm"
+            >
+              返回
+            </button>
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-medium">
