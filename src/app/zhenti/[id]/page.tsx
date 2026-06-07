@@ -93,6 +93,7 @@ export default function ZhentiDetailPage() {
       setNotesInput(data.bookmark?.notes || '')
     } catch (err) {
       console.error('获取题目详情失败:', err)
+    } finally {
       setLoading(false)
     }
   }
