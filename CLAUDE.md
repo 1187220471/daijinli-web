@@ -57,6 +57,7 @@ DATABASE_URL / JWT_SECRET / DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL / ALIYUN_ACCESS
 | 真题图片题补录 | `prisma/seed-zhenti-images.ts`（幂等） |
 | 真题数据一致性检查 | `scripts/check-titles.ts` |
 | 真题数据一致性修复 | `scripts/fix-data-consistency.ts` |
+| 代码审查报告 | `CODE_REVIEW.md` + `code-review-report.md` |
 
 ## 本地开发
 ```bash
@@ -71,3 +72,12 @@ npx prisma studio      # 数据库管理
 - 用户请求Git操作时只提供命令，不自动推送
 - 工作流：先分析需求→列出改动范围→确认后编码
 - **构建脚本不能含 `prisma db push`**：Vercel构建环境无法连接Neon，schema变更只在本地执行
+
+## 代码审查清单（每次大迭代后执行）
+1. Prisma Client 单例检查 — 统一使用 `src/lib/db.ts`
+2. API路由 `force-dynamic` 检查 — 涉及时日计算的必须添加
+3. JSON.parse 保护 — 所有解析添加 try-catch
+4. JWT Secret 检查 — **不能放在模块顶层 throw，会导致 SSR 页面崩溃**
+5. 前端错误处理 — 避免 `catch { /* ignore */ }`
+6. 依赖清理 — **删除前先 grep 确认代码中无引用**（如 `@alicloud/pop-core`）
+7. 构建后手动测试核心功能 — 仅构建通过不够，需验证页面加载、语音、答题等
