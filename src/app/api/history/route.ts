@@ -20,9 +20,11 @@ export async function GET(request: Request) {
           id: true,
           questionType: true,
           question: true,
+          userAnswer: true,
+          evaluation: true,
+          improvedAnswer: true,
           score: true,
           createdAt: true,
-          // 不返回大字段：userAnswer、evaluation、improvedAnswer
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
