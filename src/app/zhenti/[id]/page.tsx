@@ -8,9 +8,11 @@ interface ComparisonItem {
   answer_id: number
   total_score: number
   dimensions: Record<string, number>
-  pros: string[]
-  cons: string[]
-  summary: string
+  pros?: string[]
+  cons?: string[]
+  summary?: string
+  strengths?: string
+  weaknesses?: string
 }
 
 interface ZhentiDetail {
@@ -379,7 +381,7 @@ export default function ZhentiDetailPage() {
                       {isBest && (
                         <div className="text-xs text-amber-600 font-medium mt-1">🏆 最佳</div>
                       )}
-                      {item && (
+                      {item?.summary && (
                         <div className="text-xs text-slate-400 mt-1 italic">"{item.summary}"</div>
                       )}
                     </div>
@@ -465,22 +467,28 @@ export default function ZhentiDetailPage() {
                       {isExpanded && (
                         <div className="px-4 pb-4 bg-slate-50 border-t border-slate-100">
                           {/* 优缺点 */}
-                          {item && (
+                          {item && (item.pros || item.cons || item.strengths || item.weaknesses) && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 mb-4">
                               <div className="bg-green-50 rounded-xl p-3">
                                 <div className="text-xs font-medium text-green-700 mb-1.5">✅ 优点</div>
                                 <ul className="space-y-1">
-                                  {item.pros.map((p, i) => (
+                                  {(item.pros || []).map((p, i) => (
                                     <li key={i} className="text-xs text-slate-600">• {p}</li>
                                   ))}
+                                  {item.strengths && (
+                                    <li className="text-xs text-slate-600 whitespace-pre-wrap">{item.strengths}</li>
+                                  )}
                                 </ul>
                               </div>
                               <div className="bg-red-50 rounded-xl p-3">
                                 <div className="text-xs font-medium text-red-700 mb-1.5">⚠️ 不足</div>
                                 <ul className="space-y-1">
-                                  {item.cons.map((c, i) => (
+                                  {(item.cons || []).map((c, i) => (
                                     <li key={i} className="text-xs text-slate-600">• {c}</li>
                                   ))}
+                                  {item.weaknesses && (
+                                    <li className="text-xs text-slate-600 whitespace-pre-wrap">{item.weaknesses}</li>
+                                  )}
                                 </ul>
                               </div>
                             </div>
