@@ -299,7 +299,7 @@ const missingQuestions = [
     questionNumber: 1,
     questionText: '漫画题。观察这幅漫画并为其取三个标题，就其中一个标题，结合社会现象谈谈你的看法。',
     questionType: '漫画题',
-    imageUrl: '/zhenti-images/image_0.png',
+    imageUrl: null,
     answer1: `这幅漫画以生动的对比，揭示了公共服务中一个深刻命题：一视同仁的"公平"，有时恰恰是不公平的。选择《一视同仁不如量体裁衣》作为标题，我认为精准地指出了当前一些领域"标准化服务"与"个性化需求"之间的矛盾。
 
 首先，漫画讽刺了"一刀切"式的形式主义公平。上半部分中，无论高矮胖瘦、男女老少，都给同样的自行车，看似"一视同仁"，实则忽视了不同群体的差异化需求。坐轮椅的人根本无法使用，高个子骑小车憋屈，小孩够不着车座。这种"标准化"背后，是服务供给的懒惰——用统一的标准掩盖差异化的需求，用表面的公平替代实质的公正。
@@ -392,7 +392,7 @@ const missingQuestions = [
   },
 ]
 
-// 需要更新答案的现有题目
+// 需要更新答案和图片的现有题目
 const updateQuestions = [
   {
     id: 196,
@@ -444,7 +444,7 @@ const updateQuestions = [
 
 总之，《一视同仁不如量体裁衣》的启示在于：公共服务的质量，不在于是否给了每个人同样的东西，而在于是否让每个人获得了适合自己的服务。只有真正把群众的需求放在心上，把服务的精度提上去，坚持问题导向、需求导向，不断提升服务的精准度和适配性，才能让每一项政策、每一次服务都暖到群众心坎里，真正实现公共服务的优质均衡，让群众有更多获得感、幸福感、安全感。`,
     finalWordCount: 1200,
-    imageUrl: '/zhenti-images/image_0.png',
+    imageUrl: null,
   },
   {
     id: 201,
@@ -561,7 +561,7 @@ async function main() {
         data: {
           finalAnswer: q.finalAnswer,
           finalWordCount: q.finalWordCount,
-          ...(q.imageUrl ? { imageUrl: q.imageUrl } : {}),
+          imageUrl: q.imageUrl ?? null,
         },
       })
       updatedCount++
