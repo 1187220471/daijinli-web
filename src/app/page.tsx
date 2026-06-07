@@ -7,7 +7,6 @@ interface QuotaInfo {
   hasAccess: boolean
   accessLevel: string
   remainingFree: number
-  coins: number
 }
 
 interface UserInfo {

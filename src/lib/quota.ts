@@ -23,7 +23,6 @@ export async function checkQuota(userId: string, costInPoints: number = 1): Prom
     select: {
       dailyFreeCount: true,
       freeCountResetAt: true,
-      coins: true,
       accessLevel: true,
       accessExpire: true,
     },
@@ -68,17 +67,7 @@ export async function checkQuota(userId: string, costInPoints: number = 1): Prom
     }
   }
 
-  // 4. 免费点数不够，检查是否有练习币（1币=1点=2存储单位）
-  const totalStorage = user.dailyFreeCount + user.coins * SCALE
-  if (totalStorage >= costStorage) {
-    return {
-      allowed: true,
-      remainingFree: remainingPoints,
-      message: `免费点数不足，将扣除练习币（剩余${user.coins}币）`,
-    }
-  }
-
-  // 5. 完全没额度了
+  // 4. 完全没额度了
   return {
     allowed: false,
     remainingFree: 0,
@@ -87,7 +76,7 @@ export async function checkQuota(userId: string, costInPoints: number = 1): Prom
 }
 
 /**
- * 扣除用户额度（免费次数或练习币）
+ * 扣除用户额度
  * @param costInPoints 消耗点数，0.5点=出题，1点=批改。默认1点
  */
 export async function deductQuota(userId: string, costInPoints: number = 1): Promise<void> {
@@ -95,7 +84,6 @@ export async function deductQuota(userId: string, costInPoints: number = 1): Pro
     where: { id: userId },
     select: {
       dailyFreeCount: true,
-      coins: true,
       accessLevel: true,
       accessExpire: true,
     },
@@ -111,42 +99,11 @@ export async function deductQuota(userId: string, costInPoints: number = 1): Pro
 
   const costStorage = costInPoints * SCALE
 
-  // 有免费点数先扣免费点数
-  if (user.dailyFreeCount >= costStorage) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { dailyFreeCount: { decrement: costStorage } },
-    })
-    return
-  }
-
-  // 免费点数不够，先扣完剩余点数，再扣练习币（1币=1点=2存储单位）
-  const remainingStorage = user.dailyFreeCount
-  const storageNeeded = costStorage - remainingStorage
-  const coinsNeeded = Math.ceil(storageNeeded / SCALE)
-
-  if (remainingStorage > 0) {
-    if (user.coins >= coinsNeeded) {
-      // 扣完剩余点数 + 扣币
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          dailyFreeCount: 0,
-          coins: { decrement: coinsNeeded },
-        },
-      })
-      return
-    }
-  } else {
-    // 没有免费点数了，直接扣币
-    if (user.coins > 0) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { coins: { decrement: Math.max(1, coinsNeeded) } },
-      })
-      return
-    }
-  }
+  // 扣除免费点数
+  await prisma.user.update({
+    where: { id: userId },
+    data: { dailyFreeCount: { decrement: costStorage } },
+  })
 }
 
 /**
@@ -158,7 +115,6 @@ export async function getQuotaInfo(userId: string) {
     select: {
       dailyFreeCount: true,
       freeCountResetAt: true,
-      coins: true,
       accessLevel: true,
       accessExpire: true,
     },
@@ -182,7 +138,6 @@ export async function getQuotaInfo(userId: string) {
     accessLevel: user.accessLevel,
     accessExpire: user.accessExpire,
     remainingFree: hasAccess ? 999 : remainingFree,
-    coins: user.coins,
   }
 }
 
