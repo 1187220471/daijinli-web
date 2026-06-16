@@ -175,6 +175,18 @@ export default function Home() {
               江苏省考历年真题 + AI三答对比 + 汇总参考答案
             </p>
           </button>
+
+          <button
+            onClick={() => router.push('/shenlun')}
+            className="bg-white hover:bg-slate-50 text-slate-800 p-8 rounded-2xl shadow-lg transition-all hover:shadow-xl text-left border border-slate-200 group relative overflow-hidden"
+          >
+            <div className="absolute top-3 right-3 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">2018-2025</div>
+            <div className="text-4xl mb-4">📝</div>
+            <h3 className="text-xl font-bold mb-2">申论真题参考</h3>
+            <p className="text-slate-500 text-sm">
+              江苏申论历年真题 + 多名师答案 + 给定材料原文
+            </p>
+          </button>
         </div>
 
         {/* 额度提示 */}

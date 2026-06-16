@@ -1,0 +1,426 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import { getAuthHeaders } from '@/lib/auth'
+import IndentedText from '@/components/IndentedText'
+
+interface Material {
+  materialNum: string
+  content: string
+}
+
+interface TeacherAnswer {
+  teacherName: string
+  answerText: string
+}
+
+interface ShenlunDetail {
+  id: number
+  examTitle: string
+  examYear: number
+  examDate: string
+  examCategory: string
+  questionNumber: number
+  questionText: string
+  questionType: string
+  score: number | null
+  wordLimit: string | null
+  materialRange: string | null
+  referenceAnswer: string | null
+  materials: Material[]
+  answers: TeacherAnswer[]
+}
+
+interface SiblingItem {
+  id: number
+  questionNumber: number
+  questionType: string
+}
+
+const PROFICIENCY_OPTIONS = [
+  { value: 'weak', label: '生疏', emoji: '😰', color: 'border-red-300 bg-red-50 text-red-700' },
+  { value: 'okay', label: '一般', emoji: '🙂', color: 'border-yellow-300 bg-yellow-50 text-yellow-700' },
+  { value: 'mastered', label: '熟练', emoji: '😎', color: 'border-green-300 bg-green-50 text-green-700' },
+]
+
+function countChars(text: string): number {
+  return (text || '').replace(/\s/g, '').length
+}
+
+export default function ShenlunDetailPage() {
+  const router = useRouter()
+  const params = useParams()
+  const id = parseInt(params.id as string)
+
+  const [question, setQuestion] = useState<ShenlunDetail | null>(null)
+  const [siblings, setSiblings] = useState<SiblingItem[]>([])
+  const [bookmark, setBookmark] = useState<{ proficiency: string; notes: string | null } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [activeAnswerIndex, setActiveAnswerIndex] = useState(0)
+  const [expandedMaterials, setExpandedMaterials] = useState(true)
+  const [expandedAnswer, setExpandedAnswer] = useState(false)
+  const [bookmarkLoading, setBookmarkLoading] = useState(false)
+  const [notesInput, setNotesInput] = useState('')
+  const [showNotes, setShowNotes] = useState(false)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) { router.push('/login'); return }
+    fetchDetail()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, router])
+
+  const fetchDetail = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/shenlun/detail/${id}`, {
+        headers: getAuthHeaders(),
+      })
+      if (res.status === 401) { router.push('/login'); return }
+      const data = await res.json()
+      setQuestion(data.question)
+      setSiblings(data.siblings || [])
+      setBookmark(data.bookmark)
+      setNotesInput(data.bookmark?.notes || '')
+      setActiveAnswerIndex(0)
+      setExpandedMaterials(true)
+      setExpandedAnswer(false)
+    } catch (err) {
+      console.error('获取申论题目详情失败:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBookmark = async (proficiency: string) => {
+    if (bookmarkLoading) return
+    setBookmarkLoading(true)
+    try {
+      if (bookmark?.proficiency === proficiency) {
+        await fetch(`/api/shenlun/bookmark?questionId=${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        })
+        setBookmark(null)
+      } else {
+        const res = await fetch('/api/shenlun/bookmark', {
+          method: 'POST',
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questionId: id, proficiency, notes: notesInput || null }),
+        })
+        const data = await res.json()
+        setBookmark({ proficiency: data.bookmark.proficiency, notes: data.bookmark.notes })
+      }
+    } catch (err) {
+      console.error('收藏操作失败:', err)
+      setBookmarkLoading(false)
+    }
+  }
+
+  const handleSaveNotes = async () => {
+    if (!bookmark) return
+    setBookmarkLoading(true)
+    try {
+      const res = await fetch('/api/shenlun/bookmark', {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId: id, proficiency: bookmark.proficiency, notes: notesInput }),
+      })
+      const data = await res.json()
+      setBookmark({ proficiency: data.bookmark.proficiency, notes: data.bookmark.notes })
+      setShowNotes(false)
+    } catch (err) {
+      console.error('保存备注失败:', err)
+      setBookmarkLoading(false)
+    }
+  }
+
+  const navigateTo = (sibId: number) => {
+    router.push(`/shenlun/${sibId}`)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-3"></div>
+          <div className="text-slate-400 text-sm">加载中...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!question) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-3">😕</div>
+          <div className="text-slate-500">题目不存在</div>
+          <button onClick={() => router.push('/shenlun')} className="mt-4 text-primary-600 text-sm hover:underline">
+            返回列表
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const currentAnswer = question.answers[activeAnswerIndex]
+  const answerChars = currentAnswer ? countChars(currentAnswer.answerText) : 0
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-20">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-primary-600 transition-colors"
+            >
+              <span>←</span>
+              <span>首页</span>
+            </button>
+            <div className="w-px h-4 bg-slate-200" />
+            <button
+              onClick={() => router.push('/shenlun')}
+              className="text-slate-500 hover:text-slate-800 transition-colors text-sm"
+            >
+              返回
+            </button>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-medium">
+                {question.examYear}年
+              </span>
+              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                {question.examCategory}卷
+              </span>
+              <span className="text-xs text-slate-400 truncate hidden sm:block">
+                {question.examTitle} · 第{question.questionNumber}题
+              </span>
+            </div>
+          </div>
+          {/* 同场次导航 */}
+          {siblings.length > 1 && (
+            <div className="flex items-center gap-1">
+              {siblings.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => navigateTo(s.id)}
+                  className={`w-7 h-7 rounded-full text-xs font-bold transition-colors ${
+                    s.id === question.id
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-slate-100 text-slate-500 hover:bg-primary-100 hover:text-primary-600'
+                  }`}
+                >
+                  {s.questionNumber}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </header>
+
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+        {/* 题目卡片 */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <span className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 text-sm font-bold flex items-center justify-center">
+              {question.questionNumber}
+            </span>
+            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              {question.questionType}
+            </span>
+            {question.score && (
+              <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">
+                {question.score}分
+              </span>
+            )}
+            {question.wordLimit && (
+              <span className="text-xs text-slate-500">{question.wordLimit}</span>
+            )}
+            {question.materialRange && (
+              <span className="text-xs text-slate-500">{question.materialRange}</span>
+            )}
+          </div>
+          <p className="text-slate-800 leading-relaxed text-base">
+            {question.questionText}
+          </p>
+        </div>
+
+        {/* 材料原文 */}
+        {question.materials.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <button
+              onClick={() => setExpandedMaterials(!expandedMaterials)}
+              className="w-full px-5 py-3 flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors"
+            >
+              <span className="text-sm font-medium text-slate-700">
+                📄 给定材料（{question.materials.length} 则）
+              </span>
+              <span className="text-slate-400 text-sm transition-transform" style={{ transform: expandedMaterials ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                ⌄
+              </span>
+            </button>
+            {expandedMaterials && (
+              <div className="divide-y divide-slate-100">
+                {question.materials.map((m) => (
+                  <div key={m.materialNum} className="px-5 py-4">
+                    <div className="text-xs font-medium text-slate-500 mb-2">
+                      给定资料 {m.materialNum}
+                    </div>
+                    <IndentedText
+                      text={m.content}
+                      className="text-sm text-slate-700 leading-relaxed"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 掌握度标记 */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">📌 标记掌握度</span>
+            {bookmark && (
+              <button
+                onClick={() => setShowNotes(!showNotes)}
+                className="text-xs text-slate-400 hover:text-primary-600 transition-colors"
+              >
+                {showNotes ? '收起备注' : '编辑备注'}
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2 mt-3">
+            {PROFICIENCY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleBookmark(opt.value)}
+                disabled={bookmarkLoading}
+                className={`flex-1 py-2 px-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                  bookmark?.proficiency === opt.value
+                    ? opt.color + ' border-opacity-100'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                }`}
+              >
+                {opt.emoji} {opt.label}
+              </button>
+            ))}
+          </div>
+          {bookmark && bookmark.notes && !showNotes && (
+            <div className="mt-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+              📝 {bookmark.notes}
+            </div>
+          )}
+          {showNotes && bookmark && (
+            <div className="mt-3">
+              <textarea
+                value={notesInput}
+                onChange={(e) => setNotesInput(e.target.value)}
+                placeholder="写下你的学习心得或备注..."
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary-400"
+                rows={3}
+              />
+              <button
+                onClick={handleSaveNotes}
+                disabled={bookmarkLoading}
+                className="mt-2 text-xs bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+              >
+                保存备注
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 答案区域 */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          {/* Tab 头 */}
+          <div className="flex border-b border-slate-200 overflow-x-auto">
+            {question.answers.map((ans, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setActiveAnswerIndex(idx)
+                  setExpandedAnswer(false)
+                }}
+                className={`flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                  activeAnswerIndex === idx
+                    ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {ans.teacherName}
+              </button>
+            ))}
+          </div>
+
+          {/* 答案内容 */}
+          {currentAnswer && (
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-800">{currentAnswer.teacherName} 参考答案</span>
+                  <span className="text-xs text-slate-400">（{answerChars} 字）</span>
+                </div>
+                <button
+                  onClick={() => setExpandedAnswer(!expandedAnswer)}
+                  className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  {expandedAnswer ? '收起' : '展开全文'}
+                </button>
+              </div>
+              <IndentedText
+                text={currentAnswer.answerText}
+                className={`text-slate-700 leading-loose text-sm ${
+                  expandedAnswer ? '' : 'line-clamp-[12]'
+                }`}
+              />
+              {!expandedAnswer && answerChars > 400 && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setExpandedAnswer(true)}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    展开全文
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 底部导航 */}
+        {siblings.length > 1 && (
+          <div className="flex gap-3">
+            {siblings.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => navigateTo(s.id)}
+                className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
+                  s.id === question.id
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-400 hover:text-primary-600'
+                }`}
+              >
+                第 {s.questionNumber} 题
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="text-center py-4">
+          <button
+            onClick={() => router.push('/shenlun')}
+            className="text-sm text-slate-400 hover:text-primary-600 transition-colors"
+          >
+            ← 返回申论列表
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

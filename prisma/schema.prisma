@@ -119,3 +119,67 @@ model ZhentiBookmark {
   @@index([userId])
   @@map("zhenti_bookmark")
 }
+
+// 申论真题答案参考模块
+model ShenlunQuestion {
+  id              Int      @id @default(autoincrement())
+  examTitle       String   // 考试场次，如"2025年江苏省公考《申论》题（A卷）"
+  examYear        Int      // 年份，如 2025
+  examDate        String   // 日期字符串，如"2025-12-08"（无精确日期时使用年份）
+  examCategory    String   // 类别：A / B / C
+  questionNumber  Int      // 第几题
+  questionText    String   // 题目原文
+  questionType    String   @default("未分类") // 题型（归纳概括/综合分析/贯彻执行等）
+  score           Int?     // 分值
+  wordLimit       String?  // 字数要求，如"不超过250字"
+  materialRange   String?  // 材料范围，如"给定资料1-4"
+  referenceAnswer String?  // 官方参考答案（如有）
+  createdAt       DateTime @default(now())
+  materials       ShenlunMaterial[]
+  answers         ShenlunTeacherAnswer[]
+  bookmarks       ShenlunBookmark[]
+
+  @@unique([examYear, examCategory, questionNumber])
+  @@index([examYear])
+  @@index([examDate])
+  @@index([examDate, examCategory])
+  @@map("shenlun_question")
+}
+
+model ShenlunMaterial {
+  id            Int    @id @default(autoincrement())
+  questionId    Int
+  materialNum   String // 材料编号，如 "1"、"2"
+  content       String // 材料原文
+  materialOrder Int    @default(0)
+  question      ShenlunQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("shenlun_material")
+}
+
+model ShenlunTeacherAnswer {
+  id          Int    @id @default(autoincrement())
+  questionId  Int
+  teacherName String // 某笔/某站/唐棣/林峰等
+  answerText  String // 答案原文
+  answerOrder Int    @default(0) // 展示顺序
+  question    ShenlunQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("shenlun_teacher_answer")
+}
+
+model ShenlunBookmark {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  questionId  Int
+  proficiency String   @default("weak") // weak / okay / mastered
+  notes       String?
+  createdAt   DateTime @default(now())
+  question    ShenlunQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("shenlun_bookmark")
+}
