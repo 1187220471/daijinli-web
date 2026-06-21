@@ -64,6 +64,7 @@ DATABASE_URL / JWT_SECRET / DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL / ALIYUN_ACCESS
 | 申论API收藏 | `src/app/api/shenlun/bookmark/route.ts` |
 | 申论AI批改 | `src/app/api/shenlun/evaluate/route.ts`（4维度评分+逐句批改+改进版） |
 | 申论手写OCR | `src/app/api/shenlun/ocr/route.ts`（阿里云RecognizeHandwriting，图片需前端压缩至2000px JPEG 0.85） |
+| 真题批改API | `src/app/api/zhenti/evaluate/route.ts`（复用练习页批改流程，扣1额度） |
 | 申论数据入库 | `prisma/seed-shenlun.ts`（幂等，从 `.workbuddy/knowledge/jiangsu-shenlun-2018-2025-merged.json` 解析） |
 | 申论AI参考答案入库 | `prisma/seed-shenlun-reference-answers.ts`（97题，大作文900-1100字） |
 | 图片上传组件 | `src/components/ImageUploader.tsx`（Canvas压缩+OCR识别） |
