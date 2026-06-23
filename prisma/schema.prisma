@@ -12,6 +12,7 @@ model User {
   username         String    @unique
   password         String
   nickname         String?
+  openid           String?   @unique
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   coins            Int       @default(0)
