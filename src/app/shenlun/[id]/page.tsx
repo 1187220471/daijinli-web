@@ -383,82 +383,6 @@ export default function ShenlunDetailPage() {
           )}
         </div>
 
-        {/* 答案区域 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          {/* Tab 头 */}
-          <div className="flex border-b border-slate-200 overflow-x-auto">
-            {question.answers.map((ans, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  setActiveAnswerIndex(idx)
-                  setExpandedAnswer(false)
-                }}
-                className={`flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
-                  activeAnswerIndex === idx
-                    ? ans.teacherName === 'AI参考答案'
-                      ? 'text-amber-700 border-b-2 border-amber-500 bg-amber-50'
-                      : 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
-                    : ans.teacherName === 'AI参考答案'
-                      ? 'text-amber-600 hover:text-amber-700'
-                      : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {ans.teacherName === 'AI参考答案' ? (
-                  <span className="flex items-center gap-1">
-                    <span className="text-sm">✨</span>
-                    {ans.teacherName}
-                  </span>
-                ) : (
-                  ans.teacherName
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* 答案内容 */}
-          {currentAnswer && (
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  {currentAnswer.teacherName === 'AI参考答案' ? (
-                    <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-full px-3 py-1">
-                      <span className="text-sm">✨</span>
-                      <span className="text-sm font-bold text-amber-700">AI参考答案</span>
-                      <span className="text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5 font-medium">推荐</span>
-                    </span>
-                  ) : (
-                    <span className="text-sm font-bold text-slate-800">{currentAnswer.teacherName} 参考答案</span>
-                  )}
-                  <span className="text-xs text-slate-400">（{answerChars} 字）</span>
-                </div>
-                <button
-                  onClick={() => setExpandedAnswer(!expandedAnswer)}
-                  className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                >
-                  {expandedAnswer ? '收起' : '展开全文'}
-                </button>
-              </div>
-              <IndentedText
-                text={currentAnswer.answerText}
-                className={`text-slate-700 leading-loose text-sm ${
-                  expandedAnswer ? '' : 'line-clamp-[12]'
-                }`}
-              />
-              {!expandedAnswer && answerChars > 400 && (
-                <div className="mt-4 text-center">
-                  <button
-                    onClick={() => setExpandedAnswer(true)}
-                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    展开全文
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
         {/* 我的作答 */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <button
@@ -583,7 +507,7 @@ export default function ShenlunDetailPage() {
                   {/* 参考答案提示 */}
                   {hasAiReferenceAnswer && (
                     <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700">
-                      📖 参考答案已放在上方「名师答案」Tab 中，切换至「AI参考答案」可对照学习。
+                      📖 参考答案已放在下方「名师答案」Tab 中，切换至「AI参考答案」可对照学习。
                     </div>
                   )}
 
@@ -603,6 +527,82 @@ export default function ShenlunDetailPage() {
                       className="text-xs text-slate-700 bg-green-50 rounded-lg p-3 leading-relaxed"
                     />
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 答案区域 */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          {/* Tab 头 */}
+          <div className="flex border-b border-slate-200 overflow-x-auto">
+            {question.answers.map((ans, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setActiveAnswerIndex(idx)
+                  setExpandedAnswer(false)
+                }}
+                className={`flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                  activeAnswerIndex === idx
+                    ? ans.teacherName === 'AI参考答案'
+                      ? 'text-amber-700 border-b-2 border-amber-500 bg-amber-50'
+                      : 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
+                    : ans.teacherName === 'AI参考答案'
+                      ? 'text-amber-600 hover:text-amber-700'
+                      : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {ans.teacherName === 'AI参考答案' ? (
+                  <span className="flex items-center gap-1">
+                    <span className="text-sm">✨</span>
+                    {ans.teacherName}
+                  </span>
+                ) : (
+                  ans.teacherName
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* 答案内容 */}
+          {currentAnswer && (
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  {currentAnswer.teacherName === 'AI参考答案' ? (
+                    <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-full px-3 py-1">
+                      <span className="text-sm">✨</span>
+                      <span className="text-sm font-bold text-amber-700">AI参考答案</span>
+                      <span className="text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5 font-medium">推荐</span>
+                    </span>
+                  ) : (
+                    <span className="text-sm font-bold text-slate-800">{currentAnswer.teacherName} 参考答案</span>
+                  )}
+                  <span className="text-xs text-slate-400">（{answerChars} 字）</span>
+                </div>
+                <button
+                  onClick={() => setExpandedAnswer(!expandedAnswer)}
+                  className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  {expandedAnswer ? '收起' : '展开全文'}
+                </button>
+              </div>
+              <IndentedText
+                text={currentAnswer.answerText}
+                className={`text-slate-700 leading-loose text-sm ${
+                  expandedAnswer ? '' : 'line-clamp-[12]'
+                }`}
+              />
+              {!expandedAnswer && answerChars > 400 && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setExpandedAnswer(true)}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    展开全文
+                  </button>
                 </div>
               )}
             </div>

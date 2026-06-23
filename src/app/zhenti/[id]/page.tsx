@@ -85,12 +85,18 @@ export default function ZhentiDetailPage() {
   const [score, setScore] = useState<number | null>(null)
   const [answerCollapsed, setAnswerCollapsed] = useState(false)
   const [isVoiceRecording, setIsVoiceRecording] = useState(false)
+  const [isInvited, setIsInvited] = useState(false)  // 是否为邀请用户（按钮显示额度提醒）
   const voicePreviewRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) { router.push('/login'); return }
     fetchDetail()
+    // 检查邀请状态（用于按钮额度提醒）
+    fetch('/api/quota', { headers: getAuthHeaders() })
+      .then(r => r.json())
+      .then(data => { if (data.hasAccess) setIsInvited(true) })
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, router])
 
@@ -406,9 +412,23 @@ export default function ZhentiDetailPage() {
                     <button
                       onClick={handleEvaluate}
                       disabled={evaluateLoading || !userAnswer.trim()}
-                      className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                      className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
-                      {evaluateLoading ? '批改中...' : '📝 提交AI批改'}
+                      {evaluateLoading ? (
+                        <>
+                          <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                          批改中...
+                        </>
+                      ) : (
+                        <>
+                          📝 提交AI批改
+                          {isInvited ? (
+                            <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">邀请用户</span>
+                          ) : (
+                            <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">消耗1点</span>
+                          )}
+                        </>
+                      )}
                     </button>
                   </div>
                 </>

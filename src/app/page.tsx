@@ -170,7 +170,7 @@ export default function Home() {
           >
             <div className="absolute top-3 right-3 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">2008-2026</div>
             <div className="text-4xl mb-4">📜</div>
-            <h3 className="text-xl font-bold mb-2">真题复盘</h3>
+            <h3 className="text-xl font-bold mb-2">面试真题参考</h3>
             <p className="text-slate-500 text-sm">
               江苏省考历年真题 + AI三答对比 + 汇总参考答案
             </p>
