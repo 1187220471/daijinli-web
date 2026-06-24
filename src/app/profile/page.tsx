@@ -34,6 +34,10 @@ export default function Profile() {
   const [feedbackType, setFeedbackType] = useState('建议')
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [bindToken, setBindToken] = useState('')
+  const [bindLoading, setBindLoading] = useState(false)
+  const [bindMessage, setBindMessage] = useState('')
+  const [bindError, setBindError] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -143,6 +147,37 @@ export default function Profile() {
       setFeedbackMessage('网络错误，请稍后重试')
     } finally {
       setFeedbackLoading(false)
+    }
+  }
+
+  const handleGenerateBindToken = async () => {
+    setBindMessage('')
+    setBindError('')
+    setBindToken('')
+    setBindLoading(true)
+    const token = localStorage.getItem('token')
+
+    try {
+      const res = await fetch('/api/auth/bind-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setBindToken(data.token)
+        setBindMessage(`绑定码已生成，5 分钟内有效。请在小程序「我的」页面输入该绑定码。`)
+      } else {
+        setBindError(data.error || '生成失败')
+      }
+    } catch {
+      setBindError('网络错误，请稍后重试')
+    } finally {
+      setBindLoading(false)
     }
   }
 
@@ -264,6 +299,44 @@ export default function Profile() {
               <p className="text-sm text-green-600 mt-2">{inviteMessage}</p>
             )}
           </form>
+        </div>
+
+        {/* 小程序账号绑定 */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">绑定小程序</h3>
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">📱</span>
+              <span className="font-bold text-slate-700">小程序与 Web 账号共享</span>
+            </div>
+            <p className="text-sm text-slate-600">
+              绑定后，小程序登录将使用该账号，共享邀请权限、练习记录和额度。
+            </p>
+          </div>
+          <button
+            onClick={handleGenerateBindToken}
+            disabled={bindLoading}
+            className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {bindLoading ? '生成中...' : '生成小程序绑定码'}
+          </button>
+          {bindToken && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+              <p className="text-sm font-medium text-green-800 mb-2">小程序绑定码</p>
+              <p className="text-2xl font-mono font-bold text-green-900 tracking-wider break-all">
+                {bindToken}
+              </p>
+              <p className="text-xs text-green-700 mt-2">
+                复制上方绑定码，在小程序「我的」页面输入完成绑定
+              </p>
+            </div>
+          )}
+          {bindError && (
+            <p className="text-sm text-red-600 mt-2">{bindError}</p>
+          )}
+          {bindMessage && (
+            <p className="text-sm text-green-600 mt-2">{bindMessage}</p>
+          )}
         </div>
 
         {/* 使用统计 */}

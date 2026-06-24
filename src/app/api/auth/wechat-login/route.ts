@@ -40,8 +40,8 @@ export async function POST(request: Request) {
 
     const { openid } = wxData
 
-    // 2. 查找或创建用户
-    let user = await prisma.user.findUnique({ where: { openid } })
+    // 2. 查找或创建用户（openid 不再唯一，一个 User 可绑定多个微信openid，但每个 openid 只对应一个 User）
+    let user = await prisma.user.findFirst({ where: { openid } })
 
     if (!user) {
       // 创建新用户

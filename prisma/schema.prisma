@@ -12,7 +12,7 @@ model User {
   username         String    @unique
   password         String
   nickname         String?
-  openid           String?   @unique
+  openid           String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   coins            Int       @default(0)
@@ -46,6 +46,18 @@ model InvitationCode {
   usedBy    String?
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+}
+
+model BindToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("bind_token")
 }
 
 model Feedback {
