@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const client = new RPCClient({
       accessKeyId: ALIYUN_CONFIG.accessKeyId,
       accessKeySecret: ALIYUN_CONFIG.accessKeySecret,
-      endpoint: 'http://nls-meta.cn-shanghai.aliyuncs.com',
+      endpoint: 'https://nls-meta.cn-shanghai.aliyuncs.com',
       apiVersion: '2019-02-28'
     })
 
