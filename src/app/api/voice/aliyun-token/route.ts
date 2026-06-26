@@ -2,23 +2,22 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 
 /**
- * 获取阿里云语音识别的Token
- * 直接调用阿里云POP API，带超时、重试和内存缓存
+ * 获取阿里云语音识别的 Token
+ * 直接调用阿里云 POP API，带超时、重试和内存缓存
  */
 
 const ALIYUN_CONFIG = {
   accessKeyId: process.env.ALIYUN_ACCESS_KEY_ID || '',
   accessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET || '',
-  appKey: process.env.ALIYUN_APP_KEY || 'CbQtvzJ4k8mmaRLS',
+  appKey: process.env.ALIYUN_APP_KEY || '',
 }
 
 // 进程内缓存 Token（Vercel 热实例可复用）
 let cachedToken: { id: string; expireTime: number } | null = null
-const TOKEN_REFRESH_BEFORE_MS = 5 * 60 * 1000 // 提前5分钟刷新
+const TOKEN_REFRESH_BEFORE_MS = 5 * 60 * 1000 // 提前 5 分钟刷新
 
 function isTokenValid(): boolean {
   if (!cachedToken) return false
-  // 留出 5 分钟缓冲
   return cachedToken.expireTime - TOKEN_REFRESH_BEFORE_MS > Date.now() / 1000
 }
 
@@ -36,11 +35,9 @@ async function createAliyunToken(retries = 3) {
 
   for (let i = 0; i < retries; i++) {
     try {
-      // httpx timeout 格式: [connectTimeout, readTimeout]（毫秒）
       const result = await client.request('CreateToken', {}, {
         timeout: [15000, 30000],
       })
-      console.log('阿里云Token生成结果:', result)
       return result
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
@@ -61,9 +58,15 @@ export async function GET(request: Request) {
       return auth.response
     }
 
+    if (!ALIYUN_CONFIG.accessKeyId || !ALIYUN_CONFIG.accessKeySecret || !ALIYUN_CONFIG.appKey) {
+      return NextResponse.json(
+        { error: '语音识别服务配置不完整' },
+        { status: 500 }
+      )
+    }
+
     // 优先使用缓存
     if (isTokenValid()) {
-      console.log('使用缓存的阿里云Token')
       return NextResponse.json({
         token: cachedToken!.id,
         expireTime: cachedToken!.expireTime,
@@ -93,7 +96,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('获取阿里云Token失败:', error)
     return NextResponse.json(
-      { error: `获取Token失败: ${error instanceof Error ? error.message : '未知错误'}` },
+      { error: '语音识别服务暂不可用，请稍后重试' },
       { status: 500 }
     )
   }
